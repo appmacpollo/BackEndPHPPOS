@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\ProductoController;
+use App\Http\Controllers\ImprimirController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,3 +18,4 @@ use App\Http\Controllers\ProductoController;
 */
 
 Route::get('/ConsultarProducto/{ean}', [ProductoController::class, 'ConsultarProducto']);
+Route::get('/ImprimirFactura/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFactura']);

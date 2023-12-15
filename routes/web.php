@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\ProductoController;
+use App\Http\Controllers\ImprimirController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,3 +21,4 @@ Route::get('/', function () {
 });
 
 Route::get('/ConsultarProducto/{ean}', [ProductoController::class, 'ConsultarProducto']);
+Route::get('/ImprimirFactura/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFactura']);
