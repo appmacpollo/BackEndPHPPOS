@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ImprimirController;
+use App\Http\Controllers\DatafonoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,3 +20,5 @@ use App\Http\Controllers\ImprimirController;
 
 Route::get('/ConsultarProducto/{ean}', [ProductoController::class, 'ConsultarProducto']);
 Route::get('/ImprimirFactura/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFactura']);
+
+Route::get('/leerArchivoSalidaDatafono', [DatafonoController::class, 'SalidaDatafono']);
