@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\ComunController;
 use Illuminate\Support\Facades\DB;
 
 class DatafonoController extends Controller
 {
     public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura) {
-        $maquina = "01";
+        $maquina = config('app.maquina');
         $parametroMov = ["abreviatura" => $abreviatura];
         $sqlMovimiento = "select isnull(Consecutivo, 1) cons from TiposMovimientos where Abreviatura = :abreviatura";
         $tipoMovimiento = DB::select($sqlMovimiento, $parametroMov);
@@ -22,18 +23,15 @@ class DatafonoController extends Controller
             ], 200);
         }
 
-        $parametroVendedor = ["maquina" => $maquina];
-        $sqlVendedor = "select c.Usuario from Caja c inner join Parametros p on c.Fecha = p.FechaProceso  where c.Maquina = :maquina and c.FechaHasta is null";
-        $CCVendedor = DB::select($sqlVendedor, $parametroVendedor);
-
-        if(count($CCVendedor) == 0)
-        {
-            return response()->json([
-                'status' => false,
-                'message' => "NO se encuentra vendedor asignado, por favor revise.",
-                'cabecera' => array()
-            ], 200);
+        $ComunController = new ComunController();
+        $datos = $ComunController->DatosGenerales();
+        foreach ($datos['parametros'] as $value) {
+            $usuario = $value->Usuario;
+            $fechaProceso = $value->FechaProceso;
+            $turno = $value->Turno;
         }
+
+        $CCVendedor = $usuario;
 
         $devTrans = "0";
         $separador = ",";
@@ -43,22 +41,27 @@ class DatafonoController extends Controller
         $linea .= str_pad($devTrans, 12, " ", STR_PAD_RIGHT).$separador;
         $linea .= str_pad($maquina, 10, " ", STR_PAD_RIGHT).$separador;
         $linea .= str_pad($tipoMovimiento[0] -> cons, 10, " ", STR_PAD_RIGHT).$separador; 
-        $linea .= str_pad($CCVendedor[0] -> Usuario, 12, " ", STR_PAD_RIGHT).$separador; 
+        $linea .= str_pad($CCVendedor, 12, " ", STR_PAD_RIGHT).$separador; 
         $linea .= $this->getValidacionLRC($linea);
 
-        $this->EntradaDatafono($maquina, $linea);
-        $this->llamarLibreriaDatafono();
+        $respuesta = $this->EntradaDatafono($maquina, $linea);
+        if($respuesta)
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Archivo generado",
+                'cabecera' => array('numMovimiento' => $tipoMovimiento[0]->cons )
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos no podemos generar comunicacion con el datafono",
+                'cabecera' => array('numMovimiento' => 0 )
+            ], 200);
+        }
     }
-
-    public function llamarLibreriaDatafono() 
-    {
-        //pclose(popen("start /B cd D:\datafono\dis startTefServer.bat", "r"));
-        //exec('START /B java -jar lib\tefServer.jar');
-        //system("cmd /d D:\datafono\dis\startTefServer.bat");
-        echo 'se ejecuto';
-        // exec("java -jar D:\datafono\dis\lib\\tefServer.jar", $output);
-        // print_r($output);
-    } 
 
     public function EntradaDatafono($maquina, $linea) {
         $rutaInp = "D:\datafono/dis/IOFile/inp/";
@@ -68,8 +71,16 @@ class DatafonoController extends Controller
         $this->limpiardirectorio($rutaOut);
 
         $file = fopen($rutaInp."dataf0".$maquina."_inp.eft", "w");
-        fwrite($file, $linea);
-        fclose($file);
+        if(fwrite($file, $linea))
+        {
+            fclose($file);
+            sleep(1);
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 
     function limpiardirectorio($dir) { 
