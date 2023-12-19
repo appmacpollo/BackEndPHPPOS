@@ -57,7 +57,7 @@ class ImprimirController extends Controller
                 'status' => false,
                 'message' => "Factura no encontrada, por favor revise.",
                 'cabecera' => array()
-            ], 204);
+            ], 200);
         }
 
         $parametrosDetalle = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina, 
