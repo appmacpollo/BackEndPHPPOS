@@ -185,4 +185,8 @@ return [
         // 'Example' => App\Facades\Example::class,
     ])->toArray(),
 
+    'CLI_DOC_MOS' => '222222222222',
+    'grupoPrecios' => '20',
+    'maquina' => '01',
+
 ];
