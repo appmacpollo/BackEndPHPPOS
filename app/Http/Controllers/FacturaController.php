@@ -335,6 +335,11 @@ class FacturaController extends Controller
                 $TipoMovimiento = $value->TipoMovimiento;
             }
 
+            if($Consecutivo != $numMovimiento)
+            {
+                $numMovimiento = $Consecutivo;
+            }
+            
             DB::table('TiposMovimientos')
                 ->where(['TipoMovimiento' => $TipoMovimiento] )
                 ->update(['Consecutivo' => $numMovimiento + 1 ]);
