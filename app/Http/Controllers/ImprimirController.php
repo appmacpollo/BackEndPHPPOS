@@ -60,6 +60,9 @@ class ImprimirController extends Controller
             ], 200);
         }
 
+        $cabeceraFactura[0]->RutaDian = "";
+        $cabeceraFactura[0]->CUFE = "";
+
         $parametrosDetalle = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina, 
                               "factura1" => $factura, "clase1" => $clase, "prefijo1" => $prefijo, "maquina1" => $maquina];
         $sqlDetalle = "select row_number() over (order by p.Orden, p.Producto) Item, * "
