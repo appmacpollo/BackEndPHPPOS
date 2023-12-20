@@ -29,7 +29,7 @@ class ComunController extends Controller
         $parametros = DB::select('SELECT TOP 1 Usuario,FechaProceso,Turno,* '
         .'from caja '
         .'inner join Parametros on Parametros.FechaProceso = caja.fecha '
-        ."where Maquina = '$maquina' and Turno = '9' ");
+        ."where Maquina = '$maquina' and Turno > 10  and FechaHasta is null ");
 
         $datos = array("infoFactura" => $infoFactura, "ClientesDocGrupoPrecios" => $ClientesDocGrupoPrecios, "parametros" => $parametros );
 
