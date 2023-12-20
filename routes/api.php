@@ -27,3 +27,6 @@ Route::post('/facturar', [FacturaController::class, 'facturar']);
 
 Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}', [DatafonoController::class, 'EnviarADatafono']);
 Route::get('/leerArchivoSalidaDatafono', [DatafonoController::class, 'SalidaDatafono']);
+
+//Express
+Route::get('/ValidarVentasExpress', [ProductoController::class, 'ValidarCajaExpress']);

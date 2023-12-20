@@ -9,10 +9,10 @@ class ProductoController extends Controller
 {
     public function ConsultarProducto($ean)
     {
-        $grupoPrecios = config('app.grupoPrecios');
+        $grupoPrecios = env('grupoPrecios');
         $codigoBarras = $ean;
 
-        $producto = DB::select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+        $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
         . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
         . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
         . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
@@ -29,17 +29,17 @@ class ProductoController extends Controller
                 'status' => false,
                 'message' => "Producto no encontrado, Producto sin precios y/o no fue encontrado.",
                 'product' => array()
-            ], 204);
+            ], 200);
         }
 
-        $descuento = DB::select('SELECT top 1 valor,ClaseDescuento,TipoDescuento '
+        $descuento = DB::connection('sqlsrv')->select('SELECT top 1 valor,ClaseDescuento,TipoDescuento '
         . 'FROM Descuentos '
         . 'inner join productos on productos.producto = Descuentos.producto '
         . "where productos.Ean = '$codigoBarras' and GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
         . 'and (select FechaProceso from Parametros ) between fechaInicio and fechaFin '
         . 'order by ClaseDescuento desc');
 
-        $ofertas = DB::select('SELECT Ofertas.Producto,Cantidad,ProductoOferta,CantidadOferta,OfertasDetalle.UnidadMedidaVenta  '
+        $ofertas = DB::connection('sqlsrv')->select('SELECT Ofertas.Producto,Cantidad,ProductoOferta,CantidadOferta,OfertasDetalle.UnidadMedidaVenta  '
         . 'FROM Ofertas '
         . 'inner join Productos on Productos.Producto = Ofertas.Producto '
         . 'inner join OfertasDetalle on Ofertas.Oferta = OfertasDetalle.Oferta '
@@ -49,7 +49,7 @@ class ProductoController extends Controller
         $productoOfertas = array();
         foreach ($ofertas as $value) 
         {
-            $productoOfertas = DB::select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+            $productoOfertas = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
             . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
             . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
             . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
@@ -73,7 +73,7 @@ class ProductoController extends Controller
     public function ValidarCaja()
     {
         //Validar que no este en la ventana de cierre
-        $Ventanas = DB::select(" SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
+        $Ventanas = DB::connection('sqlsrv')->select(" SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
         if(count($Ventanas) >= 1)
         {
             return response()->json([
@@ -82,16 +82,48 @@ class ProductoController extends Controller
             ], 200);
         }
 
+        $claseFactura = env('claseFactura');
+        $maquina = env('maquina');
+        $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+            .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
+            .' from ResolucionFacturas '
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
+
+        foreach ($resolucionFacturas as $value)
+        {
+            $prefijo = $value->prefijo;
+            $consecutivo = $value->consecutivo;
+            $consecutivoDesde = $value->desde;
+            $consecutivoHasta = $value->hasta;
+        }
+
+        if(count($resolucionFacturas) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "No se encuentra Resolución de Factura activa para " . $claseFactura . " en la Máquina " . $maquina 
+            ], 200);
+        }
+
+        if( ($consecutivo < $consecutivoDesde) || ($consecutivo > $consecutivoHasta) )
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, El consecutivo fuera del rango .",
+            ], 200);
+        }
+
         return response()->json([
             'status' => true,
             'message' => "",
         ], 200);
+
     }
 
     public function ConsultarProductoInterno($codId)
     {
-        $grupoPrecios = config('app.grupoPrecios');
-        $producto = DB::select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+        $grupoPrecios = env('grupoPrecios');
+        $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
             . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
             . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
             . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
@@ -102,7 +134,7 @@ class ProductoController extends Controller
             . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.producto = '$codId' "
             . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 ");
 
-        $descuento = DB::select('SELECT top 1 valor,ClaseDescuento,TipoDescuento '
+        $descuento = DB::connection('sqlsrv')->select('SELECT top 1 valor,ClaseDescuento,TipoDescuento '
             . 'FROM Descuentos '
             . 'inner join productos on productos.producto = Descuentos.producto '
             . "where productos.producto = '$codId' and GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
@@ -112,5 +144,54 @@ class ProductoController extends Controller
         return $productos = array("Producto" => $producto, "Descuento" => $descuento);
     }
 
+    public function ValidarCajaExpress()
+    {
+        //Validar que no este en la ventana de cierre
+        $Ventanas = DB::connection('sqlsrv2')->select(" SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
+        if(count($Ventanas) >= 1)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "No es posible realizar venta. Caja principal se encuentra en Cierre, Inventario Fisico.",
+            ], 200);
+        }
+
+        $claseFactura = env('claseFactura');
+        $maquina = env('maquina');
+        $resolucionFacturas = DB::connection('sqlsrv2')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+            .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
+            .' from ResolucionFacturas '
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
+
+        foreach ($resolucionFacturas as $value)
+        {
+            $prefijo = $value->prefijo;
+            $consecutivo = $value->consecutivo;
+            $consecutivoDesde = $value->desde;
+            $consecutivoHasta = $value->hasta;
+        }
+
+        if(count($resolucionFacturas) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "No se encuentra Resolución de Factura activa para " . $claseFactura . " en la Máquina " . $maquina . " Express" 
+            ], 200);
+        }
+
+        if( ($consecutivo < $consecutivoDesde) || ($consecutivo > $consecutivoHasta) )
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, El consecutivo fuera del rango .",
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => "",
+        ], 200);
+
+    }
     
 }

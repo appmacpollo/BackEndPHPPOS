@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 class DatafonoController extends Controller
 {
     public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura) {
-        $maquina = config('app.maquina');
+        $maquina = env('maquina');
         $parametroMov = ["abreviatura" => $abreviatura];
         $sqlMovimiento = "select isnull(Consecutivo, 1) cons from TiposMovimientos where Abreviatura = :abreviatura";
         $tipoMovimiento = DB::select($sqlMovimiento, $parametroMov);

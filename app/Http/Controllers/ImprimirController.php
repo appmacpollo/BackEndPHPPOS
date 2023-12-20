@@ -49,7 +49,7 @@ class ImprimirController extends Controller
         . "full join Parametros pa on 1 = 1 "
         . "left join empresas em on em.Empresa = f.empresaConvenio "
         . "where f.Factura = :factura and f.ClaseFactura = :clase and f.PrefijoFactura = :prefijo and f.Maquina = :maquina";
-        $cabeceraFactura = DB::select($sqlCabecera, $parametros);
+        $cabeceraFactura = DB::connection('sqlsrv')->select($sqlCabecera, $parametros);
         
         if(count($cabeceraFactura) == 0)
         {
@@ -87,7 +87,7 @@ class ImprimirController extends Controller
         . "	and fd.PrefijoFactura = :prefijo1 and fd.Maquina = :maquina1 "
         . "	and p.GrupoArticulos in (select isnull(FamiliaEmpaques, '') from Parametros) "
         . ") p where p.Mostrar = 'X'";
-        $detalleFactura = DB::select($sqlDetalle, $parametrosDetalle);
+        $detalleFactura = DB::connection('sqlsrv')->select($sqlDetalle, $parametrosDetalle);
 
         if(count($detalleFactura) > 0)
         {
@@ -126,7 +126,7 @@ class ImprimirController extends Controller
         . ") imp "
         . "where imp.CodIva <> '' group by imp.CodIva, imp.Iva, imp.Descripcion";
 
-        $impuestos = DB::select($sqlImpuestos, $parametrosDetalle);
+        $impuestos = DB::connection('sqlsrv')->select($sqlImpuestos, $parametrosDetalle);
 
         if(count($impuestos) > 0)
         {
@@ -144,7 +144,7 @@ class ImprimirController extends Controller
         . "and m.PrefijoFacturaReferencia = :prefijo and m.Maquina = :maquina and m.Estado like '%%' "
         . "and rtrim(tm.Abreviatura) <> '' and md.ValorMovimiento is not null "
         . "and isnull(m.Observaciones, '') not in ('ANUCUADOM', 'ANURECFOR')";
-        $formasDePago = DB::select($sqlFormasDePago, $parametros);
+        $formasDePago = DB::connection('sqlsrv')->select($sqlFormasDePago, $parametros);
 
         if(count($formasDePago) > 0)
         {

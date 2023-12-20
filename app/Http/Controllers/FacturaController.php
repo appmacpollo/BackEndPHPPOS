@@ -32,14 +32,14 @@ class FacturaController extends Controller
         }
 
         //Tomar Datos de resolucion.
-        $claseFactura = 'FC';
-        $maquina = config('app.maquina');
+        $claseFactura = env('claseFactura');
+        $maquina = env('maquina');
         $prefijo = '';
 
-        $resolucionFacturas = DB::select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+        $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
             .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
             .' from ResolucionFacturas '
-            ."where ClaseFactura = '$claseFactura' and Maquina = '$maquina' and FechaAplicaHasta is null ");
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
 
         foreach ($resolucionFacturas as $value)
         {
@@ -128,19 +128,19 @@ class FacturaController extends Controller
 
         if(count($productos) > 0) $items = $this->facturacionProductos($productos); 
 
-        $documento = config('app.CLI_DOC_MOS');
-        $grupoPrecios = config('app.grupoPrecios');
+        $documento = env('CLI_DOC_MOS');
+        $grupoPrecios = env('grupoPrecios');
 
         $valorPago = 0;
         $valorImpuesto = 0;
         
         if(count($items) > 0)
         {
-            DB::beginTransaction();
+            DB::connection('sqlsrv')->beginTransaction();
 
             //Tomar Datos de resolucion.
-            $claseFactura = 'FC';
-            $maquina = config('app.maquina');
+            $claseFactura = env('claseFactura');
+            $maquina = env('maquina');
             $prefijo = '';
 
             $ComunController = new ComunController();
@@ -177,10 +177,10 @@ class FacturaController extends Controller
                 $turno = $value->Turno;
             }
 
-            $resolucionFacturas = DB::select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+            $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
             .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
             .' from ResolucionFacturas '
-            ."where ClaseFactura = '$claseFactura' and Maquina = '$maquina' and FechaAplicaHasta is null ");
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
 
             foreach ($resolucionFacturas as $value)
             {
@@ -215,12 +215,12 @@ class FacturaController extends Controller
                 ], 200);
             }
 
-            $affected = DB::table('ResolucionFacturas')
+            $affected = DB::connection('sqlsrv')->table('ResolucionFacturas')
                         ->where(['PrefijoFactura' => $prefijo , 'Resolucion' => $resolucion , 'NumeroDesde' => $consecutivoDesde] )
                         ->update(['Consecutivo' => $consecutivo + 1 ]);
 
             if($affected == 0) {
-                DB::rollBack();
+                DB::connection('sqlsrv')->rollBack();
                 return response()->json([
                     'status' => false,
                     'message' => "Lo sentimos, No se puede Actualizar la resolucion de Facturacion.",
@@ -233,7 +233,7 @@ class FacturaController extends Controller
 
             $factura = $consecutivo;
 
-            DB::table('Facturas')->insert([
+            DB::connection('sqlsrv')->table('Facturas')->insert([
                 'Factura' => $factura,
                 'ClaseFactura' => $claseFactura,
                 'PrefijoFactura' => $prefijo,
@@ -279,7 +279,7 @@ class FacturaController extends Controller
 
             foreach ($items as $value)
             {
-                DB::table('FacturasDetalle')->insert([
+                DB::connection('sqlsrv')->table('FacturasDetalle')->insert([
                     'Factura' => $factura,
                     'ClaseFactura' => $claseFactura,
                     'PrefijoFactura' => $prefijo,
@@ -303,15 +303,15 @@ class FacturaController extends Controller
                     'PorcImpUltraprocesado' => $value['impProcesado'],
                 ]);
 
-                $affected = DB::table('Productos')
+                $affected = DB::connection('sqlsrv')->table('Productos')
                             ->where('Producto', $value['producto'])
                             ->update([
-                                'Existencias' => DB::raw('ISNULL(Existencias, 0) - ' . $value['cantidad']),
-                                'ExistenciasK' => DB::raw('ISNULL(ExistenciasK, 0) - ' . $value['pesoPromedio']),
+                                'Existencias' => DB::connection('sqlsrv')->raw('ISNULL(Existencias, 0) - ' . $value['cantidad']),
+                                'ExistenciasK' => DB::connection('sqlsrv')->raw('ISNULL(ExistenciasK, 0) - ' . $value['pesoPromedio']),
                             ]);
 
                 if($affected == 0) {
-                    DB::rollBack();
+                    DB::connection('sqlsrv')->rollBack();
                     return response()->json([
                         'status' => false,
                         'message' => "Lo sentimos, No se puede Actualizar el inventario del punto.",
@@ -325,7 +325,7 @@ class FacturaController extends Controller
                 $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'];
             }
 
-            $resolucionFacturas = DB::select('SELECT top 1 Consecutivo,TipoMovimiento '
+            $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 Consecutivo,TipoMovimiento '
             .' from TiposMovimientos '
             ."where Abreviatura = '$abreviatura' ");
 
@@ -340,11 +340,11 @@ class FacturaController extends Controller
                 $numMovimiento = $Consecutivo;
             }
             
-            DB::table('TiposMovimientos')
+            DB::connection('sqlsrv')->table('TiposMovimientos')
                 ->where(['TipoMovimiento' => $TipoMovimiento] )
                 ->update(['Consecutivo' => $numMovimiento + 1 ]);
             
-            DB::table('Movimientos')->insert([
+            DB::connection('sqlsrv')->table('Movimientos')->insert([
                 'TipoMovimiento' => $TipoMovimiento,
                 'Movimiento' => $numMovimiento,
                 'Fecha' => $fechaProceso, 
@@ -366,19 +366,19 @@ class FacturaController extends Controller
                 'Usuario' => $usuario
             ]);
 
-            DB::table('MovimientosDetalle')->insert([
+            DB::connection('sqlsrv')->table('MovimientosDetalle')->insert([
                 'TipoMovimiento' => $TipoMovimiento,
                 'Movimiento' => $numMovimiento,
                 'Posicion' => 1, 
                 'ValorMovimiento' => $valorPago
             ]);
 
-            $affected = DB::table('Caja')
+            $affected = DB::connection('sqlsrv')->table('Caja')
                     ->where(['Fecha' => $fechaProceso , 'Maquina' => $maquina , 'Turno' => $turno ] )
-                    ->update(['ValorCaja' => DB::raw(' ValorCaja + ' . $valorPago ) ]);
+                    ->update(['ValorCaja' => DB::connection('sqlsrv')->raw(' ValorCaja + ' . $valorPago ) ]);
 
             if($affected == 0) {
-                DB::rollBack();
+                DB::connection('sqlsrv')->rollBack();
                 return response()->json([
                     'status' => false,
                     'message' => "Lo sentimos, Error al actualizar el valor de la caja",
@@ -389,7 +389,7 @@ class FacturaController extends Controller
                 ], 200);
             }
 
-            DB::commit();
+            DB::connection('sqlsrv')->commit();
         }
 
         return response()->json([
