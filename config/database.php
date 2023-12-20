@@ -50,6 +50,21 @@ return [
             'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
         ],
 
+        'sqlsrv2' => [
+            'driver' => 'sqlsrv',
+            'url' => env('DATABASE_URL'),
+            'host' => env('DB_HOST2', '192.168.101.70'),
+            'port' => env('DB_PORT2', '1433'),
+            'database' => env('DB_DATABASE2', 'MacPOS'),
+            'username' => env('DB_USERNAME2', 'sa'),
+            'password' => env('DB_PASSWORD2', 'almpos2008'),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('DB_ENCRYPT', 'yes'),
+            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
+        ],
+
     ],
 
     /*
