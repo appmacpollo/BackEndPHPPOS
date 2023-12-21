@@ -134,6 +134,7 @@ class DatafonoController extends Controller
 
                 return response()->json([
                     'status' => true,
+                    'codEstado' => 1,
                     'message' => "Información, Transacción Aprobada.",
                     'respuesta' => $valores
                 ], 200);
@@ -141,24 +142,28 @@ class DatafonoController extends Controller
             } else if ($arrayContenido[0] == "XX" || $arrayContenido[0] == "02") {
                 return response()->json([
                     'status' => false,
+                    'codEstado' => 2,
                     'message' => "Advertencia, Transacción Rechazada.",
                     'respuesta' => array()
                 ], 200);
             } else if ($arrayContenido[0] == "05") {
                 return response()->json([
                     'status' => false,
+                    'codEstado' => 5,
                     'message' => "Advertencia, Transacción Negada.",
                     'respuesta' => array()
                 ], 200);
             } else if ($arrayContenido[0] == "03") {
                 return response()->json([
                     'status' => false,
+                    'codEstado' => 3,
                     'message' => "Advertencia, Transacción Sin Respuesta.",
                     'respuesta' => array()
                 ], 200);
             } else {
                 return response()->json([
                     'status' => false,
+                    'codEstado' => 4,
                     'message' => "Advertencia, Transacción NO Completada.",
                     'respuesta' => array()
                 ], 200);
@@ -166,6 +171,7 @@ class DatafonoController extends Controller
         } else {
             return response()->json([
                 'status' => false,
+                'codEstado' => 0,
                 'message' => "Archivo de salida datafono no encontrado, por favor intentelo mas tarde.",
                 'respuesta' => array()
             ], 200);
