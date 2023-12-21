@@ -452,11 +452,17 @@ class FacturaController extends Controller
             {
                 foreach ($facturacion as $value)
                 {
-                    if($value['producto'] == $producto && $value['oferta'] == '')
+                    if($value['producto'] == $producto && $value['oferta'] == 'X')
                     {
                         $cantidad += $value['cantidad'] ;
                         $i = $value['item'];
                         $validador = true;
+                    }
+                    else if($value['producto'] == $producto)
+                    {
+                        $cantidad += $value['cantidad'] ;
+                        $i = $value['item'];
+                        $validador = false;
                     }
                 }
             }
