@@ -193,5 +193,66 @@ class ProductoController extends Controller
         ], 200);
 
     }
+
+    public function ConsultarProductoExpress()
+    {
+        $grupoPrecios = env('grupoPrecios');
+        $producto = DB::connection('sqlsrv2')->select('SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
+        .'isnull(pua.PesoPromedio, p.PesoPromedio) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto, '
+        .'p.Pesado pesado, isnull(pua.PesoMinimo, p.PesoMinimo) pesoMinimo, '
+        .'isnull(pua.PesoMaximo, p.PesoMaximo) pesoMaximo, p.ToleranciaMinima tolMinima, '
+        .'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias, '
+        ."(select case when count(Componente) = 0 then '' else 'X' end Com from Combos "
+        ."where Combo = p.Producto and Estado = 'A') combo, isnull(p.ExistenciasK, 0) existenciasK, "
+        .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
+        .'from Productos p left join Precios pr on p.Producto = pr.Producto '
+        .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto '
+        .'and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
+        ."where pr.GrupoPrecios = '$grupoPrecios' "
+        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and Existencias > 0 and p.GrupoArticulos not in ('COMP052','CCIAL013') "
+        ."and (select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') = '' "
+        .' union all '    
+        .'SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
+        .'isnull(pua.PesoPromedio, p.PesoPromedio) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto, '
+        .'p.Pesado pesado, isnull(pua.PesoMinimo, p.PesoMinimo) pesoMinimo, '
+        .'isnull(pua.PesoMaximo, p.PesoMaximo) pesoMaximo, p.ToleranciaMinima tolMinima, '
+        .'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias, '
+        ."(select case when count(Componente) = 0 then '' else 'X' end Com from Combos "
+        ."where Combo = p.Producto and Estado = 'A') combo, isnull(p.ExistenciasK, 0) existenciasK, "
+        .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
+        .'from Productos p left join Precios pr on p.Producto = pr.Producto '
+        .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto '
+        .'and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
+        ."where pr.GrupoPrecios = '$grupoPrecios' "
+        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and p.GrupoArticulos not in ('COMP052') "
+        ."and (select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') = 'X' " );
+        if(count($producto) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Producto no encontrado, Producto sin precios y/o no fue encontrado.",
+                'product' => array()
+            ], 200);
+        }
+
+        for ($i=0; $i < count($producto); $i++) { 
+            $producto[$i]->url = "https://web.macpollo.com/app01/". $producto[$i]->producto .".png";
+        }
+
+        $descuento = DB::connection('sqlsrv2')->select('SELECT valor,ClaseDescuento,TipoDescuento,Descuentos.producto as producto '
+            . 'FROM Descuentos '
+            . 'inner join productos on productos.producto = Descuentos.producto '
+            . "where GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
+            . 'and (select FechaProceso from Parametros ) between fechaInicio and fechaFin '
+            . 'order by ClaseDescuento desc');
+
+        return $productos = array("Producto" => $producto, "Descuento" => $descuento);
+
+        return response()->json([
+            'status' => true,
+            'message' => "Producto Encontrado",
+            'product' => $productos
+        ], 200);
+    }
     
 }
