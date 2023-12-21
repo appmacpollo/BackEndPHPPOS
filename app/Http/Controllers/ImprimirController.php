@@ -7,7 +7,49 @@ use Illuminate\Support\Facades\DB;
 
 class ImprimirController extends Controller
 {
-    public function ImprimirFactura($factura, $clase, $prefijo, $maquina) {
+    public function ImprimirFactura($factura, $clase, $prefijo, $maquina) 
+    {
+       $impresion = $this->ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, 'sqlsrv');
+       if(count($impresion) > 0)
+       {
+        return response()->json([
+            'status' => true,
+            'message' => "Factura encontrada",
+            'cabecera' => $impresion
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Factura no encontrada, por favor revise.",
+                'cabecera' => array()
+            ], 200);
+        }
+    }
+
+    public function ImprimirFacturaExpress($factura, $clase, $prefijo, $maquina) 
+    {
+       $impresion = $this->ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, 'sqlsrv2');
+       if(count($impresion) > 0)
+       {
+        return response()->json([
+            'status' => true,
+            'message' => "Factura encontrada",
+            'cabecera' => $impresion
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Factura no encontrada, por favor revise.",
+                'cabecera' => array()
+            ], 200);
+        }
+    }
+
+    public function ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, $conexion) {
         $parametros = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina];
         $sqlCabecera = "select f.Factura, f.PrefijoFactura, f.Fecha, f.FechaNovedad, f.Maquina, f.Vendedor, uv.Nombre NombreVendedor, "
         . "f.Cliente, c.DocumentoIdentidad, c.Nombre NombreCliente, isnull(c.Identificado, '') Identificado, "
@@ -49,19 +91,17 @@ class ImprimirController extends Controller
         . "full join Parametros pa on 1 = 1 "
         . "left join empresas em on em.Empresa = f.empresaConvenio "
         . "where f.Factura = :factura and f.ClaseFactura = :clase and f.PrefijoFactura = :prefijo and f.Maquina = :maquina";
-        $cabeceraFactura = DB::connection('sqlsrv')->select($sqlCabecera, $parametros);
+        $cabeceraFactura = DB::connection($conexion)->select($sqlCabecera, $parametros);
         
         if(count($cabeceraFactura) == 0)
         {
-            return response()->json([
-                'status' => false,
-                'message' => "Factura no encontrada, por favor revise.",
-                'cabecera' => array()
-            ], 200);
+            return array();
         }
 
+        $cufe = "";
+
         $cabeceraFactura[0]->RutaDian = "";
-        $cabeceraFactura[0]->CUFE = "";
+        $cabeceraFactura[0]->CUFE = $cufe;
 
         $parametrosDetalle = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina, 
                               "factura1" => $factura, "clase1" => $clase, "prefijo1" => $prefijo, "maquina1" => $maquina];
@@ -90,7 +130,7 @@ class ImprimirController extends Controller
         . "	and fd.PrefijoFactura = :prefijo1 and fd.Maquina = :maquina1 "
         . "	and p.GrupoArticulos in (select isnull(FamiliaEmpaques, '') from Parametros) "
         . ") p where p.Mostrar = 'X'";
-        $detalleFactura = DB::connection('sqlsrv')->select($sqlDetalle, $parametrosDetalle);
+        $detalleFactura = DB::connection($conexion)->select($sqlDetalle, $parametrosDetalle);
 
         if(count($detalleFactura) > 0)
         {
@@ -129,7 +169,7 @@ class ImprimirController extends Controller
         . ") imp "
         . "where imp.CodIva <> '' group by imp.CodIva, imp.Iva, imp.Descripcion";
 
-        $impuestos = DB::connection('sqlsrv')->select($sqlImpuestos, $parametrosDetalle);
+        $impuestos = DB::connection($conexion)->select($sqlImpuestos, $parametrosDetalle);
 
         if(count($impuestos) > 0)
         {
@@ -147,18 +187,13 @@ class ImprimirController extends Controller
         . "and m.PrefijoFacturaReferencia = :prefijo and m.Maquina = :maquina and m.Estado like '%%' "
         . "and rtrim(tm.Abreviatura) <> '' and md.ValorMovimiento is not null "
         . "and isnull(m.Observaciones, '') not in ('ANUCUADOM', 'ANURECFOR')";
-        $formasDePago = DB::connection('sqlsrv')->select($sqlFormasDePago, $parametros);
+        $formasDePago = DB::connection($conexion)->select($sqlFormasDePago, $parametros);
 
         if(count($formasDePago) > 0)
         {
             $cabeceraFactura[0]->formasDePago = $formasDePago;
         }
-
-        return response()->json([
-            'status' => true,
-            'message' => "Factura encontrada",
-            'cabecera' => $cabeceraFactura
-        ], 200);
+        return $cabeceraFactura ;
     }
 
 }

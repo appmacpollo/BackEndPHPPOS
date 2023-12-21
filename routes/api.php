@@ -31,3 +31,4 @@ Route::get('/leerArchivoSalidaDatafono', [DatafonoController::class, 'SalidaData
 //Express
 Route::get('/ValidarVentasExpress', [ProductoController::class, 'ValidarCajaExpress']);
 Route::get('/ConsultarProductoExpress', [ProductoController::class, 'ConsultarProductoExpress']);
+Route::get('/ImprimirFacturaExpress/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFacturaExpress']);
