@@ -9,7 +9,7 @@ class ImprimirController extends Controller
 {
     public function ImprimirFactura($factura, $clase, $prefijo, $maquina) 
     {
-       $impresion = $this->ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, 'sqlsrv');
+       $impresion = $this->ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, false);
        if(count($impresion) > 0)
        {
         return response()->json([
@@ -30,7 +30,7 @@ class ImprimirController extends Controller
 
     public function ImprimirFacturaExpress($factura, $clase, $prefijo, $maquina) 
     {
-       $impresion = $this->ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, 'sqlsrv2');
+       $impresion = $this->ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, true);
        if(count($impresion) > 0)
        {
         return response()->json([
@@ -49,7 +49,11 @@ class ImprimirController extends Controller
         }
     }
 
-    public function ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, $conexion) {
+    public function ImprimirFacturaGeneral($factura, $clase, $prefijo, $maquina, $express) {
+
+        if($express) $conexion = 'sqlsrv2';
+        else $conexion = 'sqlsrv';
+
         $parametros = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina];
         $sqlCabecera = "select f.Factura, f.PrefijoFactura, f.Fecha, f.FechaNovedad, f.Maquina, f.Vendedor, uv.Nombre NombreVendedor, "
         . "f.Cliente, c.DocumentoIdentidad, c.Nombre NombreCliente, isnull(c.Identificado, '') Identificado, "
@@ -98,9 +102,13 @@ class ImprimirController extends Controller
             return array();
         }
 
-        $cufe = "";
+        $cufe = $ruta = "" ;
+        $CufeQrFacturaElectronica = $this->getCufeQrFacturaElectronica($factura, $clase, $prefijo, $maquina, $conexion, $express);
 
-        $cabeceraFactura[0]->RutaDian = "";
+        $cufe = $CufeQrFacturaElectronica['cufe'];
+        $ruta = $CufeQrFacturaElectronica['qr'];        
+        
+        $cabeceraFactura[0]->RutaDian = $ruta;
         $cabeceraFactura[0]->CUFE = $cufe;
 
         $parametrosDetalle = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina, 
@@ -194,6 +202,145 @@ class ImprimirController extends Controller
             $cabeceraFactura[0]->formasDePago = $formasDePago;
         }
         return $cabeceraFactura ;
+    }
+
+    public function getCufeQrFacturaElectronica($factura, $clase, $prefijo, $maquina, $conexion, $express)
+    {
+        $parametros = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina];
+        $SqlFacturasCufe = 'select f.Factura factura, f.PrefijoFactura prefijo, f.Fecha fecha, f.FechaNovedad fechaNovedad, '
+        .' c.DocumentoIdentidad documento, c.DocumentoVerificado documentoVer, c.Gestionado gestionado, '
+        ." c.Identificado identificado, f.EnviaFacEle enviaFacEle, isnull(rf.ClaveTecnica, '') claveTecnica, "
+        .' ValorDomicilio valorDomicilio, IvaDomicilioExpress ivaDomicilio, '
+        .' f.DomicilioGratis domicilioGratis, f.Degustacion degusta, isnull(f.NumeroAnula, 0) numeroAnula, '
+        .' f.FechaAnula fechaAnula, rf.SoftwarePin softwarePin '
+        .' from Facturas f inner join Clientes c on f.Cliente = c.Cliente '
+        .' inner join ResolucionFacturas rf on f.PrefijoFactura = rf.PrefijoFactura '
+        .' and f.NroResolucion = rf.Resolucion '
+        ." where f.Factura = :factura and f.ClaseFactura = :clase and f.PrefijoFactura = :prefijo and f.Maquina = :maquina ";
+        $FacturasCufe = DB::connection($conexion)->select($SqlFacturasCufe, $parametros);
+
+        $SqlFacturasDetalleCufe = 'select isnull(sum(fd.ValorProducto), 0) valorProducto, '
+        .'isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto + fd.ValorImpUltraprocesado), 0) valorImpuesto '
+        .' from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
+        ." where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina "
+        ." and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) " ;
+        $FacturasDetalleCufe = DB::connection($conexion)->select($SqlFacturasDetalleCufe, $parametros);
+
+        $SqlFacturasOfertasCufe = 'select fd.ValorOferta valorOferta, fd.PorcImpuesto porcImpuesto '
+        .' from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
+        .' where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina '
+        ." and fd.Oferta = 'X' and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) ";
+        $FacturasOfertasCufe = DB::connection($conexion)->select($SqlFacturasOfertasCufe, $parametros);
+
+        $express = false;
+        $degusta = false;
+        
+        $fac = $fec =   $hor = $docAdq =   $cla = "";
+        $vf = $vi1 = $vi2 = $vi3 = $ia = 0;
+
+        if(count($FacturasCufe) <> 0)
+        {
+            foreach ($FacturasCufe as $value) 
+            {
+                $fac = $value->prefijo . $value->factura ;
+                $fec = date('Y-m-d', strtotime($value->fechaNovedad ));
+                $hor = date('H:m:s', strtotime($value->fechaNovedad ))."-05:00";
+
+                if( $value->identificado == "X" )
+                {
+                    if (f.getGestionado().equals("S")) $docAdq = $value->documentoVer == "" ? $value->documento  : $value->documentoVer;
+                    else $docAdq = $value->documento ;                
+                }
+                else $docAdq = env('CLI_DOC_MOS');
+
+                $cla = $value->claveTecnica;
+
+
+                if($value->domicilioGratis == "X" )
+                {
+                    $ia = $value->ivaDomicilio;
+                }
+                else
+                {
+                    $vf += $value->ivaDomicilio;        
+                    $vi1 += $express ? 0 : $value->ivaDomicilio;
+                    $vi2 += $express ? $value->ivaDomicilio : 0;
+                }
+                $degusta =  $value->degusta == 'X';
+            }
+        }
+
+        if(count($FacturasDetalleCufe) > 0)
+        {
+            foreach ($FacturasDetalleCufe as $value) 
+            {
+                $vf += ($value->valorProducto - $value->valorDescuento);                
+                $vi1 += $express ? 0 : $value->valorImpuesto;
+                $vi2 += $express ? $value->valorImpuesto : 0;
+            }
+        }
+
+        if(count($FacturasOfertasCufe) > 0)
+        {
+            foreach ($FacturasOfertasCufe as $value) 
+            {
+                $i = round($value->valorOferta * ($value->porcImpuesto / 100));
+                $ia += $i;
+            }
+        }
+
+        $ajuste = 0;
+        $cuponV = 0;
+        $vb = 0;
+        $vi1 += $express ? 0 : $ia;
+        $vi2 += $express ? $ia : 0;
+
+        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $vb - $ajuste - $cuponV - $ia);
+
+        $valFac = intval($vf). ".00";
+        $valImp1 = intval($vi1). ".00";
+        $valImp2 = intval($vi2). ".00";
+        $valImp3 = intval($vi3). ".00";
+        $valTot = intval($vt). ".00";
+
+        $SqlNitEmp = "select isnull(NitEmpresa, '') NitEmpresa from Parametros";
+        $nitEmp = DB::connection($conexion)->select($SqlNitEmp);
+
+        $Sqlamb = "select isnull(AmbienteDian, 1) ambienteDian from Parametros";
+        $amb = DB::connection($conexion)->select($Sqlamb);
+            
+        $cadenaCufe = $fac.$fec.$hor.$valFac."01".$valImp1."04".$valImp2."03".$valImp3.$valTot.$nitEmp[0]->NitEmpresa.$docAdq.$cla.$amb[0]->ambienteDian;
+
+        $messageDigest = hash('sha384', $cadenaCufe, true);
+
+        $result = '';
+        for ($i = 0; $i < strlen($messageDigest); $i++) {
+            $result .= sprintf("%02x", ord($messageDigest[$i]));
+        }
+
+        $cufe = $result;
+
+        $SqlRutaDian = " select isnull(RutaDian, '') rutaDian from Parametros ";
+        $RutaDian = DB::connection($conexion)->select($SqlRutaDian);
+
+        $vio = $vi2 + $vi3;
+        $valImpOtros = intval($vio).".00";
+            
+        $qr = "NumFac:" . $fac
+                . "FecFac:" . $fec
+                . "HorFac:" . $hor
+                . "NitFac:" . $nitEmp[0]->NitEmpresa
+                . "DocAdq:" . $docAdq
+                . "ValFac:" . $valFac
+                . "ValIva:" . $valImp1
+                . "ValOtroIm:" . $valImpOtros
+                . "ValTolFac:" . $valTot
+                . "CUFE:" . $cufe
+                . $RutaDian[0]->rutaDian . $cufe;
+
+        $return = array( 'cufe' => $cufe, 'qr' => $qr );
+        return $return;
+
     }
 
 }
