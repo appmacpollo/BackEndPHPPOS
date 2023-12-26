@@ -24,6 +24,7 @@ Route::get('/ImprimirFactura/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirCo
 Route::get('/ValidarVentas', [ProductoController::class, 'ValidarCaja']);
 Route::post('/ValorPago', [FacturaController::class, 'ValorPago']);
 Route::post('/facturar', [FacturaController::class, 'facturar']);
+Route::post('/ProductoOferta', [ProductoController::class, 'ProductoOferta']);
 
 Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}', [DatafonoController::class, 'EnviarADatafono']);
 Route::get('/leerArchivoSalidaDatafono', [DatafonoController::class, 'SalidaDatafono']);

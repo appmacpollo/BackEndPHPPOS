@@ -278,4 +278,47 @@ class ProductoController extends Controller
             ], 200);
         }
     }
+
+    public function ProductoOferta(Request $request) {     
+
+        $data = $request->json()->all(); 
+        $grupoPrecios = env('grupoPrecios');
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;        
+        $i = 0;
+        $Ofertas = array();
+        foreach ($data['Producto'] as $values) {
+            $producto = $values['producto'];
+            $cantidad = $values['cantidad'];
+
+            $productoOfertas = DB::connection($sqlsrv)->select("SELECT ofertas.Producto, FLOOR($cantidad/Cantidad) Cantidad,ProductoOferta,"
+            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta,Productos.Nombre "
+            . 'FROM ofertas '
+            . 'inner join OfertasDetalle on ofertas.Oferta = OfertasDetalle.Oferta '
+            . 'inner join Productos on OfertasDetalle.ProductoOferta = Productos.Producto '
+            . " WHERE GrupoPrecios = '$grupoPrecios' and ofertas.Producto = '$producto' "
+            . " and (select fechaproceso from Parametros) BETWEEN  fechaDesde and FechaHasta "); 
+            
+            $Ofertas[$i] = $productoOfertas; 
+            $i++;
+        }
+
+        if(count($Ofertas) != 0)
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Ofertas Encontradas.",
+                'producto' => $Ofertas
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Ofertas No encontradas.",
+                'producto' => array()
+            ], 200);
+        }
+
+                
+    }
 }
