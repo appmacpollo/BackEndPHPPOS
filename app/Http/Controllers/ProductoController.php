@@ -194,7 +194,7 @@ class ProductoController extends Controller
 
     }
 
-    public function ConsultarProductoExpress()
+    public function ConsultarProductoExpress($grupo)
     {
         $grupoPrecios = env('grupoPrecios');
         $producto = DB::connection('sqlsrv2')->select('SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
@@ -206,26 +206,10 @@ class ProductoController extends Controller
         ."where Combo = p.Producto and Estado = 'A') combo, isnull(p.ExistenciasK, 0) existenciasK, "
         .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
         .'from Productos p left join Precios pr on p.Producto = pr.Producto '
-        .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto '
-        .'and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
-        ."where pr.GrupoPrecios = '$grupoPrecios' "
-        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and Existencias > 0 and p.GrupoArticulos not in ('COMP052','CCIAL013') "
-        ."and (select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') = '' "
-        .' union all '    
-        .'SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
-        .'isnull(pua.PesoPromedio, p.PesoPromedio) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto, '
-        .'p.Pesado pesado, isnull(pua.PesoMinimo, p.PesoMinimo) pesoMinimo, '
-        .'isnull(pua.PesoMaximo, p.PesoMaximo) pesoMaximo, p.ToleranciaMinima tolMinima, '
-        .'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias, '
-        ."(select case when count(Componente) = 0 then '' else 'X' end Com from Combos "
-        ."where Combo = p.Producto and Estado = 'A') combo, isnull(p.ExistenciasK, 0) existenciasK, "
-        .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
-        .'from Productos p left join Precios pr on p.Producto = pr.Producto '
-        .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto '
-        .'and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
-        ."where pr.GrupoPrecios = '$grupoPrecios' "
-        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and p.GrupoArticulos not in ('COMP052') "
-        ."and (select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') = 'X' " );
+        .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
+        .'inner join ProductosPortal on ProductosPortal.material = p.producto '
+        ."where ProductosPortal.categoria = '$grupo' "
+        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and GrupoPrecios = '$grupoPrecios' " ) ;
         if(count($producto) == 0)
         {
             return response()->json([
@@ -244,9 +228,20 @@ class ProductoController extends Controller
             . 'inner join productos on productos.producto = Descuentos.producto '
             . "where GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
             . 'and (select FechaProceso from Parametros ) between fechaInicio and fechaFin '
-            . 'order by ClaseDescuento desc');
+            . 'order by Descuentos.producto,ClaseDescuento desc');
 
-        return $productos = array("Producto" => $producto, "Descuento" => $descuento);
+        $descuentos = array();
+        $productoOld = '';
+        foreach ($descuento as $value) 
+        {
+            if($value->producto != $productoOld) 
+            {
+                $descuentos[] = $value;
+                $productoOld = $value->producto;
+            }
+        }
+
+        return $productos = array("Producto" => $producto, "Descuento" => $descuentos);
 
         return response()->json([
             'status' => true,
@@ -255,4 +250,32 @@ class ProductoController extends Controller
         ], 200);
     }
     
+    public function ConsultarGruposExpress()
+    {
+        $categorias = DB::connection('sqlsrv2')->select('SELECT categoria,descripcion,material '
+            . 'FROM CategoriasPortal '
+            . "where tipo = 'G' "
+            . 'order by categoria ');
+        
+        if(count($categorias) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Grupos No Encontrado",
+                'grupos' => $categorias
+            ], 200);
+        }
+        else
+        {
+            for ($i=0; $i < count($categorias); $i++) { 
+                $categorias[$i]->url = "https://web.macpollo.com/app01/". $categorias[$i]->material .".png";
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => "Grupos Encontrado",
+                'grupos' => $categorias
+            ], 200);
+        }
+    }
 }
