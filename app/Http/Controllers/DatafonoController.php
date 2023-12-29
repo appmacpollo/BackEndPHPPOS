@@ -8,11 +8,12 @@ use Illuminate\Support\Facades\DB;
 
 class DatafonoController extends Controller
 {
-    public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura) {
+    public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura,$express) {
+        $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ;   
         $maquina = env('maquina');
         $parametroMov = ["abreviatura" => $abreviatura];
         $sqlMovimiento = "select isnull(Consecutivo, 1) cons from TiposMovimientos where Abreviatura = :abreviatura";
-        $tipoMovimiento = DB::select($sqlMovimiento, $parametroMov);
+        $tipoMovimiento = DB::connection($sqlsrv)->select($sqlMovimiento, $parametroMov);
 
         if(count($tipoMovimiento) == 0)
         {
@@ -24,7 +25,7 @@ class DatafonoController extends Controller
         }
 
         $ComunController = new ComunController();
-        $datos = $ComunController->DatosGenerales();
+        $datos = $ComunController->DatosGenerales($express);
         foreach ($datos['parametros'] as $value) {
             $usuario = $value->Usuario;
             $fechaProceso = $value->FechaProceso;
@@ -118,7 +119,8 @@ class DatafonoController extends Controller
     }
 
     public function SalidaDatafono() {
-        $file = 'D:\datafono\dis\IOFile\out\dataf001_OUT.eft';//the path of your file
+        $maquina = env('maquina');
+        $file = 'D:\datafono\dis\IOFile\out\dataf0'.$maquina.'_OUT.eft';//the path of your file
         if (file_exists($file)) {
             $contenido = file_get_contents($file);
             $arrayContenido = explode(",", $contenido);
@@ -176,5 +178,72 @@ class DatafonoController extends Controller
                 'respuesta' => array()
             ], 200);
         }
+    }
+
+
+    public function AnulacionDatafono(Request $request) 
+    {    
+        $data = $request->json()->all(); 
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;   
+        $maquina = env('maquina');
+
+        foreach ($data['movimientos'] as $values) 
+        {
+            $Factura = $values['Factura'];
+            $PrefijoFactura = $values['PrefijoFactura'];
+            $ClaseFactura = $values['ClaseFactura'];
+            $numeroReferencia = $values['NumeroReferencia'];
+            $NumeroRecibo = $values['NumeroRecibo'];
+            $NumeroRrn = $values['NumeroRrn'];
+            $Movimiento = $values['Movimiento'];
+            $ValorMovimiento = $values['ValorMovimiento'];   
+            $abreviatura = $values['Abreviatura'];                  
+        }
+
+        $consMov = $Movimiento;
+
+        $ComunController = new ComunController();
+        $datos = $ComunController->DatosGenerales($data['conexion']['express']);
+        foreach ($datos['parametros'] as $value) {
+            $usuario = $value->Usuario;
+            $fechaProceso = $value->FechaProceso;
+            $turno = $value->Turno;
+        }
+
+        $CCVendedor = $usuario;
+        $numRecibo = $NumeroRecibo;
+
+        $sep = ",";
+        $linea = "";
+
+        $linea .= "02" . $sep;
+        $linea .= str_pad($maquina, 10, " ", STR_PAD_RIGHT).$sep;
+        $linea .= $numRecibo . $sep;
+        $linea .= str_pad($consMov, 10, " ", STR_PAD_RIGHT).$sep; 
+        $linea .= str_pad($CCVendedor, 12, " ", STR_PAD_RIGHT).$sep; 
+        $linea .= $this->getValidacionLRC($linea);
+
+        $respuesta = $this->EntradaDatafono($maquina, $linea);
+        if($respuesta)
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Archivo generado",
+                'cabecera' => array('numMovimiento' => $consMov )
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos no podemos generar comunicacion con el datafono",
+                'cabecera' => array('numMovimiento' => 0 )
+            ], 200);
+        }
+    }
+
+    function is_true($val, $return_null=false){
+        $boolval = ( is_string($val) ? filter_var($val, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : (bool) $val );
+        return ( $boolval===null && !$return_null ? false : $boolval );
     }
 }
