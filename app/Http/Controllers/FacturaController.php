@@ -12,8 +12,9 @@ class FacturaController extends Controller
 
     public function ValorPago(Request $request) {    
         $data = $request->json()->all();
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;   
         $i = 1;
-        foreach ($data as $values) {
+        foreach ($data['Producto'] as $values) {
             $producto = $values['producto'];
             $cantidad = $values['cantidad'];
             $oferta = $values['oferta'];
@@ -36,10 +37,10 @@ class FacturaController extends Controller
         $maquina = env('maquina');
         $prefijo = '';
 
-        $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+        $resolucionFacturas = DB::connection($sqlsrv)->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
             .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
             .' from ResolucionFacturas '
-            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null ");
 
         foreach ($resolucionFacturas as $value)
         {
@@ -69,7 +70,7 @@ class FacturaController extends Controller
             ], 200);
         }
 
-        if(count($productos) > 0) $items = $this->facturacionProductos($productos);
+        if(count($productos) > 0) $items = $this->facturacionProductos($productos,$data['conexion']['express']);
 
         $valorPago = 0;
         $valorImpuesto = 0;
@@ -93,17 +94,17 @@ class FacturaController extends Controller
 
     public function facturar(Request $request) {     
 
-        $data = $request->json()->all();
+        $data = $request->json()->all(); 
         $i = 1;
         $numeroReferencia = $numRrn = $numRec = $abreviatura =  $digitos = 0;
         $franquicia = $tipoCuenta = '';
         foreach ($data['Producto'] as $values) {
             $producto = $values['producto'];
             $cantidad = $values['cantidad'];
-            $oferta = $values['oferta'];
+            $oferta = trim($values['oferta']);
             $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
             $i++;
-        }
+        } 
 
         foreach ($data['movimiento'] as $values) {
             $numeroReferencia = $values['numeroReferencia'];
@@ -126,10 +127,10 @@ class FacturaController extends Controller
             ], 200);
         }
 
-        if(count($productos) > 0) $items = $this->facturacionProductos($productos); 
+        if(count($productos) > 0) $items = $this->facturacionProductos($productos,false); 
 
         $documento = env('CLI_DOC_MOS');
-        $grupoPrecios = env('grupoPrecios');
+        $grupoPrecios = env('grupoPrecios'); 
 
         $valorPago = 0;
         $valorImpuesto = 0;
@@ -144,7 +145,7 @@ class FacturaController extends Controller
             $prefijo = '';
 
             $ComunController = new ComunController();
-            $datos = $ComunController->DatosGenerales();  
+            $datos = $ComunController->DatosGenerales(false);  
 
             foreach ($datos['infoFactura'] as $value) {
                 $empresa = $value->empresa;
@@ -180,7 +181,7 @@ class FacturaController extends Controller
             $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
             .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
             .' from ResolucionFacturas '
-            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null ");
 
             foreach ($resolucionFacturas as $value)
             {
@@ -193,6 +194,7 @@ class FacturaController extends Controller
 
             if(count($resolucionFacturas) == 0)
             {
+                DB::connection('sqlsrv')->rollBack();
                 return response()->json([
                     'status' => false,
                     'message' => "Lo sentimos, No se encontro una resolucion valida.",
@@ -205,6 +207,7 @@ class FacturaController extends Controller
 
             if( ($consecutivo < $consecutivoDesde) || ($consecutivo > $consecutivoHasta) )
             {
+                DB::connection('sqlsrv')->rollBack();
                 return response()->json([
                     'status' => false,
                     'message' => "Lo sentimos, El consecutivo fuera del rango .",
@@ -403,7 +406,7 @@ class FacturaController extends Controller
         
     }
 
-    public function facturacionProductos($productos) {
+    public function facturacionProductos($productos,$express) {
         $facturacion = array();
    
         $i = $cantidad = 0 ;
@@ -419,8 +422,14 @@ class FacturaController extends Controller
             $pesoPromedio = $precio = $impuesto = $pesoMinimo = $pesoMaximo = $tolMinima = $tolMaxima = $existencias = $existenciasK =  $impProcesado = $valorDescuento = 0;           
             
             $ProductoController = new ProductoController();
-            $productoConsulta = $ProductoController->ConsultarProductoInterno($lProducto);  
-           
+            if($express == true ) $productoConsulta = $ProductoController->ConsultarProductoInternoExpress($lProducto);  
+            else $productoConsulta = $ProductoController->ConsultarProductoInterno($lProducto);  
+
+            if(count($productoConsulta) == 0)
+            {
+                return array();
+            }
+
             foreach ($productoConsulta['Producto'] as $value) {
                 $producto = $value->producto;
                 $unidad = $value->unidad;
@@ -448,25 +457,21 @@ class FacturaController extends Controller
 
             $validador = false;
             $cantidad = $lCantidad;
-            if(count($facturacion) > 0)
+            
+            if(count($facturacion) > 0 && $lOferta != 'X')
             {
                 foreach ($facturacion as $value)
                 {
-                    if($value['producto'] == $producto && $value['oferta'] == 'X')
-                    {
-                        $cantidad += $value['cantidad'] ;
+                    if($value['producto'] == $producto && $value['oferta'] != 'X')
+                    { 
+                        $cantidad = $value['cantidad'] + $lCantidad;
                         $i = $value['item'];
                         $validador = true;
-                    }
-                    else if($value['producto'] == $producto)
-                    {
-                        $cantidad += $value['cantidad'] ;
-                        $i = $value['item'];
-                        $validador = false;
+                        break;
                     }
                 }
             }
-
+            
             $valor = $this->calcularValorProducto($unidad,$cantidad,$pesoPromedio,$precio);
             $descuento = $this->calcularDescuentoProducto($valor,$valorDescuento,$tipoDescuento);
             $iva = $this->calcularImpuestoProducto($valor,$descuento,$impuesto);
@@ -478,9 +483,14 @@ class FacturaController extends Controller
                 $valor = 0;
                 $valorOferta = $valor;
                 $descuento = 0;
+                $validador = false;
+                $claseDescuento = '';
+                $ivaUltra = 0;
+                $iva = 0;
             }
             else $lOferta = ' ';
 
+            if(!$validador) $i++;          
             $facturacion[$i]['item'] = $i;
             $facturacion[$i]['producto'] = $producto;
             $facturacion[$i]['unidad'] = $unidad;
@@ -495,8 +505,7 @@ class FacturaController extends Controller
             $facturacion[$i]['ivaUltra'] = $ivaUltra;
             $facturacion[$i]['claseDescuento'] = $claseDescuento;
             $facturacion[$i]['oferta'] = $lOferta;
-            $facturacion[$i]['valorOferta'] = $valorOferta;
-            if(!$validador) $i++;
+            $facturacion[$i]['valorOferta'] = $valorOferta;            
         }
         return $facturacion;
     }
@@ -522,4 +531,426 @@ class FacturaController extends Controller
         return round($valorDescuento);
     }
 
+    public function Facturas(Request $request)
+    {
+        $data = $request->json()->all(); 
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;   
+        $maquina = env('maquina');
+
+        $facturas = DB::connection($sqlsrv)->select('SELECT Facturas.Factura,Facturas.PrefijoFactura,Facturas.ClaseFactura,Facturas.Maquina,Movimientos.Movimiento,'
+        .' Movimientos.NumeroReferencia,Movimientos.NumeroRecibo,NumeroRrn,MovimientosDetalle.ValorMovimiento,Facturas.FechaNovedad,  '
+        .' (select Abreviatura from TiposMovimientos where  TiposMovimientos.TipoMovimiento = Movimientos.TipoMovimiento ) as Abreviatura'
+        .' FROM Facturas '
+        .' inner join Movimientos on Movimientos.MovimientoReferencia = Facturas.Factura and Movimientos.PrefijoFacturaReferencia = Facturas.PrefijoFactura '
+        .' and Movimientos.ClaseFacturaReferencia = Facturas.ClaseFactura and Movimientos.Maquina = Facturas.Maquina '
+        .' inner join MovimientosDetalle on Movimientos.TipoMovimiento = MovimientosDetalle.TipoMovimiento and '
+		.' Movimientos.Movimiento = MovimientosDetalle.Movimiento '
+        ." WHERE Facturas.Fecha = (select FechaProceso from Parametros ) and Facturas.OrigenPedido = 'K' AND Facturas.Maquina = '$maquina' "
+        .' order by Facturas.FechaNovedad desc');
+
+        if(count($facturas) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Valores no encontrados",
+                'facturas' => array()
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Valores no encontrados",
+                'facturas' => $facturas,
+            ], 200);
+        }
+    }
+
+    public function facturarExpress(Request $request) {     
+
+        $data = $request->json()->all();
+        $i = 1;
+        $numeroReferencia = $numRrn = $numRec = $abreviatura =  $digitos = 0;
+        $franquicia = $tipoCuenta = '';
+        foreach ($data['Producto'] as $values) {
+            $producto = $values['producto'];
+            $cantidad = $values['cantidad'];
+            $oferta = $values['oferta'];
+            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
+            $i++;
+        }
+
+        foreach ($data['movimiento'] as $values) {
+            $numeroReferencia = $values['numeroReferencia'];
+            $franquicia = $values['franquicia'];
+            $digitos = $values['digitos'];
+            $numRec = $values['numRec'];
+            $tipoCuenta = $values['tipoCuenta'];
+            $numRrn = $values['numRrn'];      
+            $abreviatura = $values['abreviatura'];      
+            $numMovimiento = $values['numMovimiento'];            
+        }
+        
+        if(count($data) == 0)
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Valores no encontrados",
+                'valorPago' => 0,
+                'valorImpuesto' => 0,
+            ], 200);
+        }
+        $valorPago = 0;
+        $valorImpuesto = 0;
+
+        if(count($productos) > 0) $items = $this->facturacionProductos($productos,true); 
+
+        DB::connection('sqlsrv2')->beginTransaction();
+
+        //Tomar Datos de resolucion.
+        $claseFactura = env('claseFactura');
+        $maquina = env('maquina');
+        $prefijo = '';
+        $documento = env('CLI_DOC_MOS');
+        $grupoPrecios = env('grupoPrecios'); 
+
+        $ComunController = new ComunController();
+        $datos = $ComunController->DatosGenerales(true);  
+
+        foreach ($datos['infoFactura'] as $value) {
+            $empresa = $value->empresa;
+            $centro = $value->centro;
+            $direccion = $value->direccion;
+            $telefono = $value->telefono;
+            $mensajeUno = $value->mensajeUno;
+            $mensajeDos = $value->mensajeDos;
+            $mensajeTres = $value->mensajeTres;
+            $mensajeCuatro = $value->mensajeCuatro;
+            $mensajeCinco = $value->mensajeCinco;
+            $ciudad = $value->ciudad;
+            $nombreCiudad = $value->nombreCiudad;
+            $departamento = $value->departamento;
+            $nombreDepartamento = $value->nombreDepartamento;
+        }
+
+        foreach ($datos['ClientesDocGrupoPrecios'] as $value) {
+            $cliente = $value->cliente;
+            $documento = $value->documento;
+            $nombre = $value->nombre;
+            $telefono = $value->telefono;
+            $direccion = $value->direccion;
+            $barrio = $value->barrio;
+        }
+
+        foreach ($datos['parametros'] as $value) {
+            $usuario = $value->Usuario;
+            $fechaProceso = $value->FechaProceso;
+            $turno = $value->Turno;
+        }
+
+        $resolucionFacturas = DB::connection('sqlsrv2')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+        .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
+        .' from ResolucionFacturas '
+        ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null ");
+
+        foreach ($resolucionFacturas as $value)
+        {
+            $prefijo = $value->prefijo;
+            $resolucion = $value->resolucion;
+            $consecutivo = $value->consecutivo;
+            $consecutivoDesde = $value->desde;
+            $consecutivoHasta = $value->hasta;
+        }
+
+        if(count($resolucionFacturas) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, No se encontro una resolucion valida.",
+                'factura' => '',
+                'claseFactura' => '',
+                'prefijoFactura' => '',
+                'maquina' => '',
+            ], 200);
+        }
+
+        $affected = DB::connection('sqlsrv2')->table('ResolucionFacturas')
+                ->where(['PrefijoFactura' => $prefijo , 'Resolucion' => $resolucion , 'NumeroDesde' => $consecutivoDesde] )
+                ->update(['Consecutivo' => $consecutivo + 1 ]);
+
+        if($affected == 0) {
+            DB::connection('sqlsrv')->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, No se puede Actualizar la resolucion de Facturacion.",
+                'factura' => '',
+                'claseFactura' => '',
+                'prefijoFactura' => '',
+                'maquina' => '',
+            ], 200);
+        }
+
+        $factura = $consecutivo;
+
+        DB::connection('sqlsrv2')->table('Facturas')->insert([
+            'Factura' => $factura,
+            'ClaseFactura' => $claseFactura,
+            'PrefijoFactura' => $prefijo,
+            'Maquina' => $maquina,
+            'Fecha' => $fechaProceso,
+            'Turno' => $turno,
+            'GrupoPrecios' => $grupoPrecios,
+            'Cliente' => $cliente,
+            'TipoVenta' => 'M',
+            'ValorDomicilio' => 0,
+            'IvaDomicilioExpress' => 0,
+            'Vendedor' => $usuario,
+            'Usuario' => $usuario,
+            'FechaNovedad' => date('d.m.Y H:i:s'),
+            'FechaEntrega' => date('d.m.Y H:i:s'),
+            'FechaLegalizacion' => date('d.m.Y H:i:s'),
+            'NroResolucion' => $resolucion,
+            'Transmitido' => '',
+            'Efectivo' => 0,
+            'Cambio' => 0,
+            'Degustacion' => '',
+            'OrigenPedido' => 'K',
+            'Barrio' => $barrio,
+            'Direccion' => $direccion,
+            'Bascula' => 'A',
+            'Estado' => 'R',
+            'NombresEntrega' => '',
+            'ApellidosEntrega' => '',
+            'BarrioEntrega' => '',
+            'DireccionEntrega' => '',
+            'TelefonoEntrega' => '',
+            'NombreRecibe' => '',
+            'DiasPlazo' => 0,
+            'DomicilioGratis' => '',
+            'Atendio' => $usuario,
+            'EnviaFacEle' => '',
+            'Enviado' => '',
+            'IndConvenio' => 'N',
+            'DocumentoConvenio' => '',
+            'EmpresaConvenio' => '',
+            'NombreConvenio' => ''                
+        ]);
+
+        foreach ($items as $value)
+        {
+            DB::connection('sqlsrv2')->table('FacturasDetalle')->insert([
+                'Factura' => $factura,
+                'ClaseFactura' => $claseFactura,
+                'PrefijoFactura' => $prefijo,
+                'Maquina' => $maquina,
+                'Producto' => $value['producto'],
+                'UnidadMedidaVenta' => $value['unidad'],
+                'Oferta' => $value['oferta'],
+                'Unidades' => $value['cantidad'],
+                'Kilos' => $value['pesoPromedio'],
+                'ValorProducto' => $value['valor'],
+                'ValorDescuento' => $value['descuento'],
+                'ValorImpuesto' => $value['iva'],
+                'Precio' => $value['precio'],
+                'ValorOferta' => $value['valorOferta'],
+                'SaborBebida' => '',
+                'Empaque' => '',
+                'PorcImpuesto' => $value['impuesto'],
+                'ClaseDescuento' => $value['claseDescuento'],
+                'ValorDescuentoConvenio' => 0,
+                'ValorImpUltraprocesado' => $value['ivaUltra'],
+                'PorcImpUltraprocesado' => $value['impProcesado'],
+            ]);
+
+            $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'];
+        }
+
+        $resolucionFacturas = DB::connection('sqlsrv2')->select('SELECT top 1 Consecutivo,TipoMovimiento '
+            .' from TiposMovimientos '
+            ."where Abreviatura = '$abreviatura' ");
+
+        foreach ($resolucionFacturas as $value)
+        {
+            $Consecutivo = $value->Consecutivo;
+            $TipoMovimiento = $value->TipoMovimiento;
+        }
+
+        if($Consecutivo != $numMovimiento)
+        {
+            $numMovimiento = $Consecutivo;
+        }
+
+        DB::connection('sqlsrv2')->table('TiposMovimientos')
+            ->where(['TipoMovimiento' => $TipoMovimiento] )
+            ->update(['Consecutivo' => $numMovimiento + 1 ]);
+        
+        DB::connection('sqlsrv2')->table('Movimientos')->insert([
+            'TipoMovimiento' => $TipoMovimiento,
+            'Movimiento' => $numMovimiento,
+            'Fecha' => $fechaProceso, 
+            'Maquina' => $maquina,
+            'Turno' => $turno,
+            'MovimientoReferencia' => $factura,
+            'ClaseFacturaReferencia' => $claseFactura,
+            'PrefijoFacturaReferencia' => $prefijo,
+            'FechaMovimientoReferencia' => $fechaProceso,
+            'Cliente' => $cliente,
+            'NumeroReferencia' => $numeroReferencia,
+            'DigitosTarjeta' => $digitos,  
+            'Franquicia' => $franquicia,
+            'TipoCuenta' => $tipoCuenta,
+            'NumeroRecibo' => $numRec,      
+            'NumeroRrn' => $numRrn,             
+            'Estado' => 'A',
+            'FechaNovedad' => date('d.m.Y H:i:s'),
+            'Usuario' => $usuario
+        ]);
+
+        DB::connection('sqlsrv2')->table('MovimientosDetalle')->insert([
+            'TipoMovimiento' => $TipoMovimiento,
+            'Movimiento' => $numMovimiento,
+            'Posicion' => 1, 
+            'ValorMovimiento' => $valorPago
+        ]);
+
+        $affected = DB::connection('sqlsrv2')->table('Caja')
+                ->where(['Fecha' => $fechaProceso , 'Maquina' => $maquina , 'Turno' => $turno ] )
+                ->update(['ValorCaja' => DB::connection('sqlsrv')->raw(' ValorCaja + ' . $valorPago ) ]);
+
+        if($affected == 0) {
+            DB::connection('sqlsrv2')->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, Error al actualizar el valor de la caja",
+                'factura' => '',
+                'claseFactura' => '',
+                'prefijoFactura' => '',
+                'maquina' => '',
+            ], 200);
+        }
+
+        DB::connection('sqlsrv2')->commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => "Valores Calculados",
+            'factura' => $factura,
+            'claseFactura' => $claseFactura,
+            'prefijoFactura' => $prefijo,
+            'maquina' => $maquina
+        ], 200);
+
+    }
+
+    public function AnularFactura(Request $request) {     
+
+        $data = $request->json()->all(); 
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;   
+        $maquina = env('maquina');
+
+        foreach ($data['movimientos'] as $values) 
+        {
+            $Factura = $values['Factura'];
+            $PrefijoFactura = $values['PrefijoFactura'];
+            $ClaseFactura = $values['ClaseFactura'];
+            $numeroReferencia = $values['NumeroReferencia'];
+            $NumeroRecibo = $values['NumeroRecibo'];
+            $NumeroRrn = $values['NumeroRrn'];
+            $Movimiento = $values['Movimiento'];
+            $ValorMovimiento = $values['ValorMovimiento'];   
+            $abreviatura = $values['Abreviatura'];                  
+        }
+
+        $ComunController = new ComunController();
+        $datos = $ComunController->DatosGenerales($data['conexion']['express']); 
+
+        foreach ($datos['parametros'] as $value) {
+            $usuario = $value->Usuario;
+            $fechaProceso = $value->FechaProceso;
+            $turno = $value->Turno;
+        }
+
+        DB::connection($sqlsrv)->beginTransaction();
+
+        $affected = DB::connection($sqlsrv)->table('Caja')
+            ->where(['Fecha' => $fechaProceso , 'Maquina' => $maquina , 'Turno' => $turno ] )
+            ->update(['ValorCaja' => DB::connection($sqlsrv)->raw(' ValorCaja - ' . $ValorMovimiento ) ]);
+
+        if($affected == 0) {
+            DB::connection($sqlsrv)->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, No se puede Actualizar el valor de la caja",
+            ], 200);
+        }
+
+        // Ejecutar la consulta
+        $resultadoConsulta = DB::connection($sqlsrv)->table('facturas')->selectRaw('ISNULL(MAX(NumeroAnula), 0) AS numeroAnula')->get();
+
+        // Obtener el valor de 'numeroAnula' del resultado
+        $numeroAnula = $resultadoConsulta[0]->numeroAnula;
+
+        $affected = DB::connection($sqlsrv)->table('Facturas')
+            ->where(['Factura' => $Factura , 'ClaseFactura' => $ClaseFactura , 'Turno' => $turno ] )
+            ->update(['Estado' => 'I' , 'MotivoAnulaFactura' => '031', 'UsuarioAnula' => $usuario, 'FechaAnula' => date('d.m.Y H:i:s'), 'NumeroAnula' => $numeroAnula,  ]);
+
+        if($affected == 0) {
+            DB::connection($sqlsrv)->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, No se puede Actualizar el valor de la caja",
+            ], 200);
+        }
+
+        DB::connection($sqlsrv)->commit();
+    }
+
+    public function procesarExistenciasProductos($productos,$express,$operacion)
+    {
+        $proceso = false;
+        $factor = $operador == '+' ? 1 : ($operador == '-' ? -1 : 1);
+        foreach ($productos as $value)
+        {
+            $infoProducto = DB::connection($sqlsrv)->select('SELECT c.Combo combo, c.Componente componente, p.Nombre nombre, c.Cantidad cantidad,'
+                .' EmpaqueAlmacen empAlmacen, EmpaqueDomicilio empDomicilio, p.PesoPromedio pesoPromedio,  '
+                .' isnull(p.Existencias, 0) existencias,p.UnidadMedidaVenta '
+                .' FROM Combos c '
+                .' inner join Productos p on c.Componente = p.Producto '
+                ." WHERE c.Estado = 'A' AND c.Combo = '". $value['producto']."' "
+                .' order by c.Combo');
+            
+            if(count($infoProducto) == 0)
+            {
+                foreach ($infoProducto as $values) 
+                {
+                    $componente = $values->componente;
+                    $cantidades = $values->cantidad;
+                    $pesoPromedio = $values->pesoPromedio;
+                    $UnidadMedidaVenta = $values->UnidadMedidaVenta;
+
+                    $affected = DB::connection('sqlsrv')->table('Productos')
+                            ->where('Producto', $componente)
+                            ->update([
+                                'Existencias' => DB::connection('sqlsrv')->raw('ISNULL(Existencias, 0) '.$operacion.' ' . ($cantidades * $factor)),
+                                'ExistenciasK' => DB::connection('sqlsrv')->raw('ISNULL(ExistenciasK, 0) '.$operacion.' ' . ($pesoPromedio * $factor )),
+                            ]);
+
+                    if($affected == 0) return false;
+                }
+            }
+            else
+            {
+                $affected = DB::connection('sqlsrv')->table('Productos')
+                            ->where('Producto', $value['producto'])
+                            ->update([
+                                'Existencias' => DB::connection('sqlsrv')->raw('ISNULL(Existencias, 0) '.$operacion.' ' . ($cantidades * $factor)),
+                                'ExistenciasK' => DB::connection('sqlsrv')->raw('ISNULL(ExistenciasK, 0) '.$operacion.' ' . ($pesoPromedio * $factor )),
+                            ]);
+
+                if($affected == 0) return false;
+            }
+            $proceso = true;
+        }
+        return $proceso;
+    }
 }

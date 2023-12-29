@@ -21,16 +21,19 @@ use App\Http\Controllers\FacturaController;
 
 Route::get('/ConsultarProducto/{ean}', [ProductoController::class, 'ConsultarProducto']);
 Route::get('/ImprimirFactura/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFactura']);
-Route::get('/ValidarVentas', [ProductoController::class, 'ValidarCaja']);
+Route::get('/ValidarVentas/{express}', [ProductoController::class, 'ValidarCaja']);
 Route::post('/ValorPago', [FacturaController::class, 'ValorPago']);
 Route::post('/facturar', [FacturaController::class, 'facturar']);
 Route::post('/ProductoOferta', [ProductoController::class, 'ProductoOferta']);
+Route::post('/Facturas', [FacturaController::class, 'Facturas']);
 
-Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}', [DatafonoController::class, 'EnviarADatafono']);
+//Datafono
+Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}', [DatafonoController::class, 'EnviarADatafono']);
 Route::get('/leerArchivoSalidaDatafono', [DatafonoController::class, 'SalidaDatafono']);
+Route::post('/AnulacionDatafono', [DatafonoController::class, 'AnulacionDatafono']);
 
 //Express
-Route::get('/ValidarVentasExpress', [ProductoController::class, 'ValidarCajaExpress']);
 Route::get('/ConsultarProductoExpress/{grupo}', [ProductoController::class, 'ConsultarProductoExpress']);
 Route::get('/ImprimirFacturaExpress/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFacturaExpress']);
 Route::get('/ConsultarGrupos', [ProductoController::class, 'ConsultarGruposExpress']);
+Route::post('/facturarExpress', [FacturaController::class, 'facturarExpress']);

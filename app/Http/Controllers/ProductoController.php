@@ -70,10 +70,11 @@ class ProductoController extends Controller
         ], 200);
     }
 
-    public function ValidarCaja()
+    public function ValidarCaja($express)
     {
+        $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ;   
         //Validar que no este en la ventana de cierre
-        $Ventanas = DB::connection('sqlsrv')->select(" SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
+        $Ventanas = DB::connection($sqlsrv)->select(" SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
         if(count($Ventanas) >= 1)
         {
             return response()->json([
@@ -84,10 +85,10 @@ class ProductoController extends Controller
 
         $claseFactura = env('claseFactura');
         $maquina = env('maquina');
-        $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
+        $resolucionFacturas = DB::connection($sqlsrv)->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
             .' NumeroHasta hasta, FechaResolucionHasta fechaResHasta '
             .' from ResolucionFacturas '
-            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null AND IndKiosco = 'X'");
+            ."where ClaseFactura = '$claseFactura' AND Maquina = '$maquina' AND FechaAplicaHasta is null ");
 
         foreach ($resolucionFacturas as $value)
         {
@@ -320,5 +321,47 @@ class ProductoController extends Controller
         }
 
                 
+    }
+
+    public function ConsultarProductoInternoExpress($codId)
+    {
+        $grupoPrecios = env('grupoPrecios');
+        $producto = DB::connection('sqlsrv2')->select('SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
+        .'isnull(pua.PesoPromedio, p.PesoPromedio) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto, '
+        .'p.Pesado pesado, isnull(pua.PesoMinimo, p.PesoMinimo) pesoMinimo, '
+        .'isnull(pua.PesoMaximo, p.PesoMaximo) pesoMaximo, p.ToleranciaMinima tolMinima, '
+        .'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias, '
+        ."(select case when count(Componente) = 0 then '' else 'X' end Com from Combos "
+        ."where Combo = p.Producto and Estado = 'A') combo, isnull(p.ExistenciasK, 0) existenciasK, "
+        .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
+        .'from Productos p left join Precios pr on p.Producto = pr.Producto '
+        .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
+        .'inner join ProductosPortal on ProductosPortal.material = p.producto '
+        ."where p.producto = '$codId' and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and GrupoPrecios = '$grupoPrecios' " ) ;
+        if(count($producto) == 0)
+        {
+            return array();
+        }
+
+        $descuento = DB::connection('sqlsrv2')->select('SELECT top 1 valor,ClaseDescuento,TipoDescuento,Descuentos.producto as producto '
+        . 'FROM Descuentos '
+        . 'inner join productos on productos.producto = Descuentos.producto '
+        . "where productos.producto = '$codId' AND GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
+        . 'and (select FechaProceso from Parametros ) between fechaInicio and fechaFin '
+        . 'order by ClaseDescuento desc');
+
+        $descuentos = array();
+        $productoOld = '';
+        foreach ($descuento as $value) 
+        {
+            if($value->producto != $productoOld) 
+            {
+                $descuentos[] = $value;
+                $productoOld = $value->producto;
+            }
+        }
+
+        return $productos = array("Producto" => $producto, "Descuento" => $descuento);
+    
     }
 }
