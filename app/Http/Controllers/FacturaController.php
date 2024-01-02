@@ -306,26 +306,20 @@ class FacturaController extends Controller
                     'PorcImpUltraprocesado' => $value['impProcesado'],
                 ]);
 
-                $affected = DB::connection('sqlsrv')->table('Productos')
-                            ->where('Producto', $value['producto'])
-                            ->update([
-                                'Existencias' => DB::connection('sqlsrv')->raw('ISNULL(Existencias, 0) - ' . $value['cantidad']),
-                                'ExistenciasK' => DB::connection('sqlsrv')->raw('ISNULL(ExistenciasK, 0) - ' . $value['pesoPromedio']),
-                            ]);
-
-                if($affected == 0) {
-                    DB::connection('sqlsrv')->rollBack();
-                    return response()->json([
-                        'status' => false,
-                        'message' => "Lo sentimos, No se puede Actualizar el inventario del punto.",
-                        'factura' => '',
-                        'claseFactura' => '',
-                        'prefijoFactura' => '',
-                        'maquina' => '',
-                    ], 200);
-                }
-
                 $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'];
+            }
+
+            $ind_inventario = $this->procesarExistenciasProductos($items,false,"-");  
+            if(!$ind_inventario) {
+                DB::connection('sqlsrv')->rollBack();
+                return response()->json([
+                    'status' => false,
+                    'message' => "Lo sentimos, Error al actualizar el inventario",
+                    'factura' => '',
+                    'claseFactura' => '',
+                    'prefijoFactura' => '',
+                    'maquina' => '',
+                ], 200);
             }
 
             $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 Consecutivo,TipoMovimiento '
@@ -545,14 +539,14 @@ class FacturaController extends Controller
         .' and Movimientos.ClaseFacturaReferencia = Facturas.ClaseFactura and Movimientos.Maquina = Facturas.Maquina '
         .' inner join MovimientosDetalle on Movimientos.TipoMovimiento = MovimientosDetalle.TipoMovimiento and '
 		.' Movimientos.Movimiento = MovimientosDetalle.Movimiento '
-        ." WHERE Facturas.Fecha = (select FechaProceso from Parametros ) and Facturas.OrigenPedido = 'K' AND Facturas.Maquina = '$maquina' "
-        .' order by Facturas.FechaNovedad desc');
+        ." WHERE Facturas.Fecha = (select FechaProceso from Parametros ) and Facturas.OrigenPedido = 'K' AND Facturas.Maquina = '$maquina' and Facturas.Estado not in ('I')  "
+        .' order by Facturas.Factura desc');
 
         if(count($facturas) == 0)
         {
             return response()->json([
                 'status' => false,
-                'message' => "Valores no encontrados",
+                'message' => "Facturas no encontradas",
                 'facturas' => array()
             ], 200);
         }
@@ -560,7 +554,7 @@ class FacturaController extends Controller
         {
             return response()->json([
                 'status' => true,
-                'message' => "Valores no encontrados",
+                'message' => "Facturas encontrados",
                 'facturas' => $facturas,
             ], 200);
         }
@@ -596,14 +590,28 @@ class FacturaController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => "Valores no encontrados",
-                'valorPago' => 0,
-                'valorImpuesto' => 0,
+                'factura' => '',
+                'claseFactura' => '',
+                'prefijoFactura' => '',
+                'maquina' => '',
             ], 200);
         }
         $valorPago = 0;
         $valorImpuesto = 0;
 
         if(count($productos) > 0) $items = $this->facturacionProductos($productos,true); 
+        
+        if(count($items) <= 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, Error no se encontraron productos validos",
+                'factura' => '',
+                'claseFactura' => '',
+                'prefijoFactura' => '',
+                'maquina' => '',
+            ], 200);
+        }
 
         DB::connection('sqlsrv2')->beginTransaction();
 
@@ -691,6 +699,19 @@ class FacturaController extends Controller
         }
 
         $factura = $consecutivo;
+        
+        $ind_inventario = $this->procesarExistenciasProductos($items,true,"-");  
+        if(!$ind_inventario) {
+            DB::connection('sqlsrv2')->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, Error al actualizar el inventario",
+                'factura' => '',
+                'claseFactura' => '',
+                'prefijoFactura' => '',
+                'maquina' => '',
+            ], 200);
+        }
 
         DB::connection('sqlsrv2')->table('Facturas')->insert([
             'Factura' => $factura,
@@ -884,31 +905,91 @@ class FacturaController extends Controller
             ], 200);
         }
 
+        $affectedM = DB::connection($sqlsrv)->table('Movimientos')
+            ->where(['MovimientoReferencia' => $Factura, 'ClaseFacturaReferencia' => $ClaseFactura, 'PrefijoFacturaReferencia' => $PrefijoFactura, 'Maquina' => $maquina ] )
+            ->update(['Estado' => 'I', 'UsuarioAnula' => $usuario, 'FechaAnula' => date('d.m.Y H:i:s') ]);
+
+        if($affectedM == 0) {
+            DB::connection($sqlsrv)->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, No se puede Actualizar el estado del Movimiento",
+            ], 200);
+        }
+
         // Ejecutar la consulta
         $resultadoConsulta = DB::connection($sqlsrv)->table('facturas')->selectRaw('ISNULL(MAX(NumeroAnula), 0) AS numeroAnula')->get();
 
         // Obtener el valor de 'numeroAnula' del resultado
         $numeroAnula = $resultadoConsulta[0]->numeroAnula;
 
-        $affected = DB::connection($sqlsrv)->table('Facturas')
+        $affectedF = DB::connection($sqlsrv)->table('Facturas')
             ->where(['Factura' => $Factura , 'ClaseFactura' => $ClaseFactura , 'Turno' => $turno ] )
             ->update(['Estado' => 'I' , 'MotivoAnulaFactura' => '031', 'UsuarioAnula' => $usuario, 'FechaAnula' => date('d.m.Y H:i:s'), 'NumeroAnula' => $numeroAnula,  ]);
 
-        if($affected == 0) {
+        if($affectedF == 0) {
             DB::connection($sqlsrv)->rollBack();
             return response()->json([
                 'status' => false,
-                'message' => "Lo sentimos, No se puede Actualizar el valor de la caja",
+                'message' => "Lo sentimos, No se puede Actualizar el estado de la factura",
+            ], 200);
+        }
+
+        $productoLocal = DB::connection($sqlsrv)->select('SELECT fd.Producto producto, fd.UnidadMedidaVenta unidadVenta, p.Nombre nombre, fd.Oferta oferta, '
+            .'fd.Unidades unidades, fd.Kilos kilos, fd.Precio precio, fd.ValorProducto valorProducto, '
+            .'fd.ValorDescuento valorDescuento, fd.ValorImpuesto valorImpuesto, fd.ValorOferta valorOferta, '
+            ."fd.SaborBebida saborBebida,isnull(i.CodIva, '') codIva, p.Ean ean, fd.Empaque empaque, "
+            ."fd.PorcImpuesto porcImpuesto, isnull(fd.ClaseDescuento, '') claseDescuento, "
+            .'fd.ValorDescuentoConvenio valDescuentoConvenio, fd.ValorImpUltraprocesado impUltra '
+            .'from Facturas f inner join FacturasDetalle fd on f.Factura = fd.Factura '
+            .'and f.ClaseFactura = fd.ClaseFactura and f.PrefijoFactura = fd.PrefijoFactura '
+            .'and f.Maquina = fd.Maquina '
+            .'inner join Productos p on fd.Producto = p.Producto '
+            ."left join Impuestos i on CONCAT('IVV' , fd.PorcImpuesto) = i.Codigo "
+            ."where fd.Factura = $Factura and fd.ClaseFactura = '$ClaseFactura' and fd.PrefijoFactura = '$PrefijoFactura' and fd.Maquina = $maquina  "
+            ."and p.GrupoArticulos not in (select isnull(FamiliaEmpaques, '') from Parametros)" );
+
+        $i = 0;
+        foreach ($productoLocal as $values)   {
+            $producto = $values->producto;
+            $cantidad = $values->unidades;
+            $oferta = $values->oferta;
+            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
+            $i++;
+        }
+
+        if(count($productos) > 0) $items = $this->facturacionProductos($productos,$data['conexion']['express']); 
+        
+        if(count($items) <= 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, Error no se encontraron productos para la anulacion de la factura "
+            ], 200);
+        }
+        
+        $ind_inventario = $this->procesarExistenciasProductos($items,$data['conexion']['express'],"+");  
+        if(!$ind_inventario) {
+            DB::connection($sqlsrv)->rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => "Lo sentimos, Error al actualizar el inventario Anulacion de Facturas"
             ], 200);
         }
 
         DB::connection($sqlsrv)->commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => "Factura Anulada Con exito."
+        ], 200);
     }
 
     public function procesarExistenciasProductos($productos,$express,$operacion)
     {
+        $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ; 
         $proceso = false;
-        $factor = $operador == '+' ? 1 : ($operador == '-' ? -1 : 1);
+        $factor = $operacion == '+' ? 1 : ($operacion == '-' ? -1 : 1);  
         foreach ($productos as $value)
         {
             $infoProducto = DB::connection($sqlsrv)->select('SELECT c.Combo combo, c.Componente componente, p.Nombre nombre, c.Cantidad cantidad,'
@@ -918,8 +999,12 @@ class FacturaController extends Controller
                 .' inner join Productos p on c.Componente = p.Producto '
                 ." WHERE c.Estado = 'A' AND c.Combo = '". $value['producto']."' "
                 .' order by c.Combo');
-            
-            if(count($infoProducto) == 0)
+
+            $cantidades = $value['cantidad'];
+            $pesoPromedio = $value['pesoPromedio'];
+            $UnidadMedidaVenta = $value['unidad']; 
+
+            if(count($infoProducto) != 0)
             {
                 foreach ($infoProducto as $values) 
                 {
@@ -928,29 +1013,32 @@ class FacturaController extends Controller
                     $pesoPromedio = $values->pesoPromedio;
                     $UnidadMedidaVenta = $values->UnidadMedidaVenta;
 
-                    $affected = DB::connection('sqlsrv')->table('Productos')
+                    $affected = DB::connection($sqlsrv)->table('Productos')
                             ->where('Producto', $componente)
                             ->update([
-                                'Existencias' => DB::connection('sqlsrv')->raw('ISNULL(Existencias, 0) '.$operacion.' ' . ($cantidades * $factor)),
-                                'ExistenciasK' => DB::connection('sqlsrv')->raw('ISNULL(ExistenciasK, 0) '.$operacion.' ' . ($pesoPromedio * $factor )),
+                                'Existencias' => DB::connection($sqlsrv)->raw('ISNULL(Existencias, 0) + ' . ($cantidades * $factor)),
+                                'ExistenciasK' => DB::connection($sqlsrv)->raw('ISNULL(ExistenciasK, 0) + ' . ($pesoPromedio * $factor )),
                             ]);
-
                     if($affected == 0) return false;
                 }
             }
             else
             {
-                $affected = DB::connection('sqlsrv')->table('Productos')
+                $affected = DB::connection($sqlsrv)->table('Productos')
                             ->where('Producto', $value['producto'])
                             ->update([
-                                'Existencias' => DB::connection('sqlsrv')->raw('ISNULL(Existencias, 0) '.$operacion.' ' . ($cantidades * $factor)),
-                                'ExistenciasK' => DB::connection('sqlsrv')->raw('ISNULL(ExistenciasK, 0) '.$operacion.' ' . ($pesoPromedio * $factor )),
+                                'Existencias' => DB::connection($sqlsrv)->raw('ISNULL(Existencias, 0) + ' . ($cantidades * $factor)),
+                                'ExistenciasK' => DB::connection($sqlsrv)->raw('ISNULL(ExistenciasK, 0) + ' . ($pesoPromedio * $factor )),
                             ]);
-
                 if($affected == 0) return false;
             }
             $proceso = true;
         }
         return $proceso;
+    }
+
+    function is_true($val, $return_null=false){
+        $boolval = ( is_string($val) ? filter_var($val, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : (bool) $val );
+        return ( $boolval===null && !$return_null ? false : $boolval );
     }
 }
