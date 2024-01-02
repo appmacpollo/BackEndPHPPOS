@@ -74,7 +74,7 @@ class ProductoController extends Controller
     {
         $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ;   
         //Validar que no este en la ventana de cierre
-        $Ventanas = DB::connection($sqlsrv)->select(" SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
+        $Ventanas = DB::connection($sqlsrv)->select("SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
         if(count($Ventanas) >= 1)
         {
             return response()->json([
