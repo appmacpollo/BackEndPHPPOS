@@ -116,7 +116,7 @@ class ProductoController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => "",
+            'message' => "Se encuentra todo correcto",
         ], 200);
 
     }
@@ -198,7 +198,7 @@ class ProductoController extends Controller
     public function ConsultarProductoExpress($grupo)
     {
         $grupoPrecios = env('grupoPrecios');
-        $producto = DB::connection('sqlsrv2')->select('SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
+        $producto = DB::connection('sqlsrv2')->select('SELECT distinct p.Producto producto, pr.UnidadMedidaVenta unidad, ProductosPortal.descripcion nombre, '
         .'isnull(pua.PesoPromedio, p.PesoPromedio) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto, '
         .'p.Pesado pesado, isnull(pua.PesoMinimo, p.PesoMinimo) pesoMinimo, '
         .'isnull(pua.PesoMaximo, p.PesoMaximo) pesoMaximo, p.ToleranciaMinima tolMinima, '
@@ -280,14 +280,15 @@ class ProductoController extends Controller
         }
     }
 
-    public function ProductoOferta(Request $request) {     
-
+    public function ProductoOferta(Request $request)
+    {     
         $data = $request->json()->all(); 
         $grupoPrecios = env('grupoPrecios');
         $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;        
         $i = 0;
         $Ofertas = array();
-        foreach ($data['Producto'] as $values) {
+        foreach ($data['Producto'] as $values) 
+        {
             $producto = $values['producto'];
             $cantidad = $values['cantidad'];
 
@@ -318,9 +319,7 @@ class ProductoController extends Controller
                 'message' => "Ofertas No encontradas.",
                 'producto' => array()
             ], 200);
-        }
-
-                
+        }     
     }
 
     public function ConsultarProductoInternoExpress($codId)
@@ -363,5 +362,10 @@ class ProductoController extends Controller
 
         return $productos = array("Producto" => $producto, "Descuento" => $descuento);
     
+    }
+
+    function is_true($val, $return_null=false){
+        $boolval = ( is_string($val) ? filter_var($val, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : (bool) $val );
+        return ( $boolval===null && !$return_null ? false : $boolval );
     }
 }
