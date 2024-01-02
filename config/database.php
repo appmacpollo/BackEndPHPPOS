@@ -53,9 +53,9 @@ return [
         'sqlsrv2' => [
             'driver' => 'sqlsrv',
             'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST2', '192.168.101.70'),
+            'host' => env('DB_HOST2', '192.168.101.69'),
             'port' => env('DB_PORT2', '1433'),
-            'database' => env('DB_DATABASE2', 'MacPOS'),
+            'database' => env('DB_DATABASE2', 'MacPOS_EXPRESS'),
             'username' => env('DB_USERNAME2', 'sa'),
             'password' => env('DB_PASSWORD2', 'almpos2008'),
             'charset' => 'utf8',
