@@ -27,6 +27,7 @@ Route::post('/facturar', [FacturaController::class, 'facturar']);
 Route::post('/ProductoOferta', [ProductoController::class, 'ProductoOferta']);
 Route::post('/Facturas', [FacturaController::class, 'Facturas']);
 Route::post('/AnularFactura', [FacturaController::class, 'AnularFactura']);
+Route::get('/ConsultarBolsas', [ProductoController::class, 'ConsultarBolsas']);
 
 //Datafono
 Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}', [DatafonoController::class, 'EnviarADatafono']);
