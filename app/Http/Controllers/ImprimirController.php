@@ -179,6 +179,13 @@ class ImprimirController extends Controller
 
         $impuestos = DB::connection($conexion)->select($sqlImpuestos, $parametrosDetalle);
 
+        if($express)
+        {
+            for ($i=0; $i < count($impuestos); $i++) { 
+                $impuestos[$i]->Descripcion = str_replace('IVA DE VENTAS AL 8 %', 'Impuesto al Consumo', $impuestos[$i]->IvaDomiExpress.'% '.$impuestos[$i]->Descripcion);
+            }
+        }
+
         if(count($impuestos) > 0)
         {
             $cabeceraFactura[0]->totalImpuestos = $impuestos;
