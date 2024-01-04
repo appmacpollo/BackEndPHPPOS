@@ -30,6 +30,7 @@ Route::post('/Facturas', [FacturaController::class, 'Facturas']);
 Route::post('/AnularFactura', [FacturaController::class, 'AnularFactura']);
 Route::get('/ConsultarBolsas', [ProductoController::class, 'ConsultarBolsas']);
 Route::post('/Autorizacion', [ComunController::class, 'Autorizacion']);
+Route::get('/ImprimirAnulacionFactura/{factura}/{clase}/{prefijo}/{maquina}/{express}', [ImprimirController::class, 'ImprimirAnulacionFactura']);
 
 //Datafono
 Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}', [DatafonoController::class, 'EnviarADatafono']);
