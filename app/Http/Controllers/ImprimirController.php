@@ -177,14 +177,26 @@ class ImprimirController extends Controller
         . ") imp "
         . "where imp.CodIva <> '' group by imp.CodIva, imp.Iva, imp.Descripcion";
 
-        $impuestos = DB::connection($conexion)->select($sqlImpuestos, $parametrosDetalle);
+        $impuesto = DB::connection($conexion)->select($sqlImpuestos, $parametrosDetalle);
 
-        if($express)
+        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorProducto Impuesto, '' IvaDomiExpress, 'INC Bolsa Plástica:' Descripcion "
+        . "from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto "
+        . "where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
+        . "and fd.PrefijoFactura = '$prefijo' and fd.Maquina = '$maquina' "
+        . "and p.GrupoArticulos in (select isnull(FamiliaEmpaques, '') from Parametros) ";
+
+        $impuestosBolsa = DB::connection($conexion)->select($SQLimpBolsa);
+        if(count($impuesto) > 0)
         {
-            for ($i=0; $i < count($impuestos); $i++) { 
-                $impuestos[$i]->Descripcion = str_replace('IVA DE VENTAS AL 8 %', 'Impuesto al Consumo', $impuestos[$i]->IvaDomiExpress.'% '.$impuestos[$i]->Descripcion);
+            if($express)
+            {
+                for ($i=0; $i < count($impuesto); $i++) { 
+                    $impuesto[$i]->Descripcion = str_replace('IVA DE VENTAS AL 8 %', 'Impuesto al Consumo', $impuesto[$i]->IvaDomiExpress.'% '.$impuesto[$i]->Descripcion);
+                }
             }
         }
+
+        $impuestos = array_merge($impuesto, $impuestosBolsa);
 
         if(count($impuestos) > 0)
         {
