@@ -21,7 +21,7 @@ class ProductoController extends Controller
         . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta "
         . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
         . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.Ean = '$codigoBarras' "
-        . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 ");
+        . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc  ");
 
         if(count($producto) == 0)
         {
