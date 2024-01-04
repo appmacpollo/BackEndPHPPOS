@@ -7,6 +7,7 @@ use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ImprimirController;
 use App\Http\Controllers\DatafonoController;
 use App\Http\Controllers\FacturaController;
+use App\Http\Controllers\ComunController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,6 +29,7 @@ Route::post('/ProductoOferta', [ProductoController::class, 'ProductoOferta']);
 Route::post('/Facturas', [FacturaController::class, 'Facturas']);
 Route::post('/AnularFactura', [FacturaController::class, 'AnularFactura']);
 Route::get('/ConsultarBolsas', [ProductoController::class, 'ConsultarBolsas']);
+Route::post('/Autorizacion', [ComunController::class, 'Autorizacion']);
 
 //Datafono
 Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}', [DatafonoController::class, 'EnviarADatafono']);

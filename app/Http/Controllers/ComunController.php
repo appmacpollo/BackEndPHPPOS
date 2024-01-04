@@ -37,4 +37,31 @@ class ComunController extends Controller
 
         return $datos;
     }
+
+    public function Autorizacion(Request $request)
+    {
+        $data = $request->json()->all(); 
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;     
+        $usuario = $data['autorizacion']['credenciales'] ;
+
+        $usuarios = DB::connection($sqlsrv)->select('SELECT * '
+            .'from Usuarios '
+            ." where Cedula = '$usuario' and Estado = 'A' " );
+
+        if(count($usuarios) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Usuario NO Autorizado"
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Usuario Autorizado"
+            ], 200);
+        }
+
+    }
 }
