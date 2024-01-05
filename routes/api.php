@@ -28,7 +28,7 @@ Route::post('/facturar', [FacturaController::class, 'facturar']);
 Route::post('/ProductoOferta', [ProductoController::class, 'ProductoOferta']);
 Route::post('/Facturas', [FacturaController::class, 'Facturas']);
 Route::post('/AnularFactura', [FacturaController::class, 'AnularFactura']);
-Route::get('/ConsultarBolsas', [ProductoController::class, 'ConsultarBolsas']);
+Route::get('/ConsultarBolsas/{express}', [ProductoController::class, 'ConsultarBolsas']);
 Route::post('/Autorizacion', [ComunController::class, 'Autorizacion']);
 Route::get('/ImprimirAnulacionFactura/{factura}/{clase}/{prefijo}/{maquina}/{express}', [ImprimirController::class, 'ImprimirAnulacionFactura']);
 
