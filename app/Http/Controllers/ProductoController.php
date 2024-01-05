@@ -400,11 +400,11 @@ class ProductoController extends Controller
     }
 
 
-    public function ConsultarBolsas(Request $request)
+    public function ConsultarBolsas($express)
     {
         $data = $request->json()->all(); 
         $grupoPrecios = env('grupoPrecios');
-        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;
+        $conexion = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ; 
 
         $producto = DB::connection($conexion)->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
         . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
