@@ -293,7 +293,7 @@ class ProductoController extends Controller
             $cantidad = $values['cantidad'];
 
             $productoOfertas = DB::connection($sqlsrv)->select("SELECT ofertas.Producto, FLOOR($cantidad/Cantidad) Cantidad,ProductoOferta,"
-            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta,Productos.Nombre "
+            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta,Productos.Nombre as Nombre "
             . 'FROM ofertas '
             . 'inner join OfertasDetalle on ofertas.Oferta = OfertasDetalle.Oferta '
             . 'inner join Productos on OfertasDetalle.ProductoOferta = Productos.Producto '
@@ -303,13 +303,43 @@ class ProductoController extends Controller
             $Ofertas[$i] = $productoOfertas; 
             $i++;
         }
+       
+        $totalizados = array();
+        foreach ($Ofertas as $item) { 
+            $nombre = $item[0]->Nombre;
+            $productoOferta = $item[0]->ProductoOferta;
+            $cantidad = $item[0]->CantidadOferta;
+        
+            if (!isset($totalizados[$productoOferta])) 
+            {
+                $totalizados[$productoOferta] = 0;
+            }
+            $totalizados[$productoOferta] += $cantidad;
+        }
 
-        if(count($Ofertas) != 0)
+        $resultado = array();
+        $i = 0;
+        foreach ($totalizados as $key => $value) {
+            if($value != 0) 
+            {
+                $resultado[$i]['ProductoOferta'] = $key ;
+                $resultado[$i]['CantidadOferta'] = $value ;
+                foreach ($Ofertas as $valorOferta)
+                {
+                    if($valorOferta[0]->ProductoOferta == $key){ 
+                        $resultado[$i]['Nombre'] = $valorOferta[0]->Nombre ;
+                    }
+                }
+                $i++;
+            }
+        }
+        
+        if(count($resultado) != 0)
         {
             return response()->json([
                 'status' => true,
                 'message' => "Ofertas Encontradas.",
-                'producto' => $Ofertas
+                'producto' => $resultado
             ], 200);
         }
         else
@@ -319,7 +349,7 @@ class ProductoController extends Controller
                 'message' => "Ofertas No encontradas.",
                 'producto' => array()
             ], 200);
-        }     
+        }  
     }
 
     public function ConsultarProductoInternoExpress($codId)
@@ -370,10 +400,13 @@ class ProductoController extends Controller
     }
 
 
-    public function ConsultarBolsas()
+    public function ConsultarBolsas(Request $request)
     {
+        $data = $request->json()->all(); 
         $grupoPrecios = env('grupoPrecios');
-        $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+        $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;
+
+        $producto = DB::connection($conexion)->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
         . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
         . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
         . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
@@ -381,11 +414,11 @@ class ProductoController extends Controller
         . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
         . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta "
         . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
-        . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.GrupoArticulos = 'COMP052' "
+        . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.GrupoArticulos = ( select FamiliaEmpaques from Parametros )  "
         . " and pr.Estado = 'A' and p.Estado = 'A' and pr.Precio > 0 "
         . ' order by Existencias desc ');
 
-        $producto2 = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+        $producto2 = DB::connection($conexion)->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
         . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
         . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
         . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
