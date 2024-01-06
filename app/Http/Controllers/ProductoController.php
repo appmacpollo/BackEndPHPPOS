@@ -286,7 +286,7 @@ class ProductoController extends Controller
         $grupoPrecios = env('grupoPrecios');
         $sqlsrv = ($data['conexion']['express']) ? 'sqlsrv2' : 'sqlsrv' ;        
         $i = 0;
-        $Ofertas = array();
+        $Ofertas = [];
         foreach ($data['Producto'] as $values) 
         {
             $producto = $values['producto'];
@@ -300,47 +300,60 @@ class ProductoController extends Controller
             . " WHERE GrupoPrecios = '$grupoPrecios' and ofertas.Producto = '$producto' "
             . " and (select fechaproceso from Parametros) BETWEEN  fechaDesde and FechaHasta "); 
             
-            $Ofertas[$i] = $productoOfertas; 
+            if (count($productoOfertas)>0) {
+                $Ofertas[$i] = $productoOfertas; 
+            }
             $i++;
         }
        
         $totalizados = array();
-        foreach ($Ofertas as $item) { 
-            $nombre = $item[0]->Nombre;
-            $productoOferta = $item[0]->ProductoOferta;
-            $cantidad = $item[0]->CantidadOferta;
-        
-            if (!isset($totalizados[$productoOferta])) 
-            {
-                $totalizados[$productoOferta] = 0;
-            }
-            $totalizados[$productoOferta] += $cantidad;
-        }
-
-        $resultado = array();
-        $i = 0;
-        foreach ($totalizados as $key => $value) {
-            if($value != 0) 
-            {
-                $resultado[$i]['ProductoOferta'] = $key ;
-                $resultado[$i]['CantidadOferta'] = $value ;
-                foreach ($Ofertas as $valorOferta)
-                {
-                    if($valorOferta[0]->ProductoOferta == $key){ 
-                        $resultado[$i]['Nombre'] = $valorOferta[0]->Nombre ;
-                    }
-                }
-                $i++;
-            }
-        }
-        
-        if(count($resultado) != 0)
+        if (count($Ofertas)>0) 
         {
-            return response()->json([
-                'status' => true,
-                'message' => "Ofertas Encontradas.",
-                'producto' => $resultado
-            ], 200);
+            foreach ($Ofertas as $item) { 
+                $nombre = $item[0]->Nombre;
+                $productoOferta = $item[0]->ProductoOferta;
+                $cantidad = $item[0]->CantidadOferta;
+            
+                if (!isset($totalizados[$productoOferta])) 
+                {
+                    $totalizados[$productoOferta] = 0;
+                }
+                $totalizados[$productoOferta] += $cantidad;
+            }
+    
+            $resultado = array();
+            $i = 0;
+            foreach ($totalizados as $key => $value) {
+                if($value != 0) 
+                {
+                    $resultado[$i]['ProductoOferta'] = $key ;
+                    $resultado[$i]['CantidadOferta'] = $value ;
+                    foreach ($Ofertas as $valorOferta)
+                    {
+                        if($valorOferta[0]->ProductoOferta == $key){ 
+                            $resultado[$i]['Nombre'] = $valorOferta[0]->Nombre ;
+                        }
+                    }
+                    $i++;
+                }
+            }
+            
+            if(count($resultado) != 0)
+            {
+                return response()->json([
+                    'status' => true,
+                    'message' => "Ofertas Encontradas.",
+                    'producto' => $resultado
+                ], 200);
+            }
+            else
+            {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Ofertas No encontradas.",
+                    'producto' => array()
+                ], 200);
+            }        
         }
         else
         {
@@ -349,7 +362,8 @@ class ProductoController extends Controller
                 'message' => "Ofertas No encontradas.",
                 'producto' => array()
             ], 200);
-        }  
+        } 
+      
     }
 
     public function ConsultarProductoInternoExpress($codId)
@@ -365,7 +379,7 @@ class ProductoController extends Controller
         .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
         .'from Productos p left join Precios pr on p.Producto = pr.Producto '
         .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
-        .'inner join ProductosPortal on ProductosPortal.material = p.producto '
+        .'left join ProductosPortal on ProductosPortal.material = p.producto '
         ."where p.producto = '$codId' and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and GrupoPrecios = '$grupoPrecios' " ) ;
         if(count($producto) == 0)
         {
@@ -402,7 +416,6 @@ class ProductoController extends Controller
 
     public function ConsultarBolsas($express)
     {
-        $data = $request->json()->all(); 
         $grupoPrecios = env('grupoPrecios');
         $conexion = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ; 
 
