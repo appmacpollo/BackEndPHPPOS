@@ -35,7 +35,7 @@ class ProductoController extends Controller
         $descuento = DB::connection('sqlsrv')->select('SELECT top 1 valor,ClaseDescuento,TipoDescuento '
         . 'FROM Descuentos '
         . 'inner join productos on productos.producto = Descuentos.producto '
-        . "where productos.Ean = '$codigoBarras' and GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
+        . "where productos.producto = ".$producto[0]->producto." and productos.Ean = '$codigoBarras' and GrupoPrecios = '$grupoPrecios' and Descuentos.Estado = 'A' "
         . 'and (select FechaProceso from Parametros ) between fechaInicio and fechaFin '
         . 'order by ClaseDescuento desc');
 
@@ -43,7 +43,7 @@ class ProductoController extends Controller
         . 'FROM Ofertas '
         . 'inner join Productos on Productos.Producto = Ofertas.Producto '
         . 'inner join OfertasDetalle on Ofertas.Oferta = OfertasDetalle.Oferta '
-        . "WHERE productos.Ean = '$codigoBarras' and GrupoPrecios = '$grupoPrecios' "
+        . "WHERE productos.producto = ".$producto[0]->producto." and productos.Ean = '$codigoBarras' and GrupoPrecios = '$grupoPrecios' "
         . 'and (select FechaProceso from Parametros ) between FechaDesde and FechaHasta ');
  
         $productoOfertas = array();
