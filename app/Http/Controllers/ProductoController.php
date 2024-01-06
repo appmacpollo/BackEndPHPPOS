@@ -369,7 +369,7 @@ class ProductoController extends Controller
     public function ConsultarProductoInternoExpress($codId)
     {
         $grupoPrecios = env('grupoPrecios');
-        $producto = DB::connection('sqlsrv2')->select('SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, '
+        $producto = DB::connection('sqlsrv2')->select('SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, isnull(ProductosPortal.descripcion,p.Producto) nombre, '
         .'isnull(pua.PesoPromedio, p.PesoPromedio) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto, '
         .'p.Pesado pesado, isnull(pua.PesoMinimo, p.PesoMinimo) pesoMinimo, '
         .'isnull(pua.PesoMaximo, p.PesoMaximo) pesoMaximo, p.ToleranciaMinima tolMinima, '
