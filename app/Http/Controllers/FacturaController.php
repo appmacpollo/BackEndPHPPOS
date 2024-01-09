@@ -475,7 +475,7 @@ class FacturaController extends Controller
             if($lOferta == 'X')
             {
                 $valor = 0;
-                $valorOferta = $valor;
+                $valorOferta = intval($precio) * intval($cantidad);
                 $descuento = 0;
                 $validador = false;
                 $claseDescuento = '';
