@@ -293,10 +293,11 @@ class ProductoController extends Controller
             $cantidad = $values['cantidad'];
 
             $productoOfertas = DB::connection($sqlsrv)->select("SELECT ofertas.Producto, FLOOR($cantidad/Cantidad) Cantidad,ProductoOferta,"
-            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta,Productos.Nombre as Nombre "
+            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta,isnull(ProductosPortal.descripcion,Productos.Nombre) as Nombre "
             . 'FROM ofertas '
             . 'inner join OfertasDetalle on ofertas.Oferta = OfertasDetalle.Oferta '
             . 'inner join Productos on OfertasDetalle.ProductoOferta = Productos.Producto '
+            . 'left join ProductosPortal on ProductosPortal.material = Productos.producto '
             . " WHERE GrupoPrecios = '$grupoPrecios' and ofertas.Producto = '$producto' "
             . " and (select fechaproceso from Parametros) BETWEEN  fechaDesde and FechaHasta "); 
             
