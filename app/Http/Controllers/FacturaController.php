@@ -1009,14 +1009,13 @@ class FacturaController extends Controller
                 foreach ($infoProducto as $values) 
                 {
                     $componente = $values->componente;
-                    $cantidades = $values->cantidad;
                     $pesoPromedio = $values->pesoPromedio;
                     $UnidadMedidaVenta = $values->UnidadMedidaVenta;
 
                     $affected = DB::connection($sqlsrv)->table('Productos')
                             ->where('Producto', $componente)
                             ->update([
-                                'Existencias' => DB::connection($sqlsrv)->raw('ISNULL(Existencias, 0) + ' . ($cantidades * $factor)),
+                                'Existencias' => DB::connection($sqlsrv)->raw('ISNULL(Existencias, 0) + ' . (($cantidades * $values->cantidad) * $factor)),
                                 'ExistenciasK' => DB::connection($sqlsrv)->raw('ISNULL(ExistenciasK, 0) + ' . ($pesoPromedio * $factor )),
                             ]);
                     if($affected == 0) return false;
