@@ -10,6 +10,7 @@ class DatafonoController extends Controller
 {
     public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura,$express) {
         $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ;   
+        $express = ($this->is_true($express) == true ) ? true : false ;   
         $maquina = env('maquina');
         $parametroMov = ["abreviatura" => $abreviatura];
         $sqlMovimiento = "select isnull(Consecutivo, 1) cons from TiposMovimientos where Abreviatura = :abreviatura";
@@ -65,8 +66,9 @@ class DatafonoController extends Controller
     }
 
     public function EntradaDatafono($maquina, $linea) {
-        $rutaInp = "D:\datafono/dis/IOFile/inp/";
-        $rutaOut = "D:\datafono/dis/IOFile/out/"; 
+
+        $rutaInp = env('rutaDatafono')."inp/";
+        $rutaOut = env('rutaDatafono')."out/"; 
 
         $this->limpiardirectorio($rutaInp);
         $this->limpiardirectorio($rutaOut);
@@ -119,8 +121,10 @@ class DatafonoController extends Controller
     }
 
     public function SalidaDatafono() {
+        $rutaInp = env('rutaDatafono')."inp/";
+        $rutaOut = env('rutaDatafono')."out/"; 
         $maquina = env('maquina');
-        $file = 'D:\datafono\dis\IOFile\out\dataf0'.$maquina.'_OUT.eft';//the path of your file
+        $file = $rutaOut.'dataf0'.$maquina.'_OUT.eft';//the path of your file
         if (file_exists($file)) {
             $contenido = file_get_contents($file);
             $arrayContenido = explode(",", $contenido);
