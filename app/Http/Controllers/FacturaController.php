@@ -18,7 +18,10 @@ class FacturaController extends Controller
             $producto = $values['producto'];
             $cantidad = $values['cantidad'];
             $oferta = $values['oferta'];
-            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
+            $kilos = $values['pesoPromedio'];
+            $precio = $values['precio'];
+            $pesado = trim($values['pesado']);
+            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta, 'kilos' => $kilos, 'precio' => $precio, 'pesado' => $pesado);
             $i++;
         }
         
@@ -102,7 +105,10 @@ class FacturaController extends Controller
             $producto = $values['producto'];
             $cantidad = $values['cantidad'];
             $oferta = trim($values['oferta']);
-            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
+            $kilos = $values['pesoPromedio'];
+            $precio = $values['precio'];
+            $pesado = trim($values['pesado']);
+            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta, 'kilos' => $kilos, 'precio' => $precio, 'pesado' => $pesado);
             $i++;
         } 
 
@@ -411,6 +417,9 @@ class FacturaController extends Controller
             $lProducto = $producto['producto'];
             $lCantidad = $producto['cantidad'];
             $lOferta = $producto['oferta'];
+            $lkilos = $producto['kilos'];
+            $lprecio = $producto['precio'];
+            $lpesado = $producto['pesado'];
 
             $producto = $unidad = $nombre = $claseDescuento = $tipoDescuento = '';
             $pesoPromedio = $precio = $impuesto = $pesoMinimo = $pesoMaximo = $tolMinima = $tolMaxima = $existencias = $existenciasK =  $impProcesado = $valorDescuento = 0;           
@@ -438,6 +447,18 @@ class FacturaController extends Controller
                 $existencias = $value->existencias;
                 $existenciasK = $value->existenciasK;
                 $impProcesado = $value->impProcesado;
+            }
+
+            if($express == false && $lpesado == 'X' )
+            {
+                if(floatval($lkilos) != floatval($pesoPromedio))
+                { 
+                    $pesoPromedio = $lkilos;
+                } 
+                if(floatval($precio) != floatval($lprecio))
+                { 
+                    $precio = ($lprecio > 0) ? $lprecio : $precio ;
+                } 
             }
 
             if(count($productoConsulta['Descuento']) > 0)
@@ -570,7 +591,10 @@ class FacturaController extends Controller
             $producto = $values['producto'];
             $cantidad = $values['cantidad'];
             $oferta = $values['oferta'];
-            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
+            $kilos = $values['pesoPromedio'];
+            $precio = $values['precio'];
+            $pesado = trim($values['pesado']);
+            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta, 'kilos' => $kilos, 'precio' => $precio, 'pesado' => $pesado);
             $i++;
         }
 
