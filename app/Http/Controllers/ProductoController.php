@@ -12,16 +12,39 @@ class ProductoController extends Controller
         $grupoPrecios = env('grupoPrecios');
         $codigoBarras = $ean;
 
-        $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
-        . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
-        . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
-        . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
-        . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
-        . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
-        . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta "
-        . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
-        . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.Ean = '$codigoBarras' "
-        . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc  ");
+        if (strpos($codigoBarras, '|') !== false) 
+        {
+            $posiciones = explode("|", $codigoBarras);
+            $codigo = $posiciones[0];
+            $unidades = $posiciones[1];
+            $kilos = $posiciones[2];
+            $precio = $posiciones[3];
+
+            $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+            . "isnull('$kilos', 0) pesoPromedio, case when '$precio' = 0 then pr.Precio else '$precio' end precio, p.ValorImpuesto impuesto,"
+            . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
+            . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
+            . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
+            . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
+            . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta,p.Ean,'$unidades' cantidad "
+            . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
+            . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.producto = '$codigo' "
+            . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc  ");
+            $codigoBarras = $producto[0]->Ean;
+        }
+        else
+        {
+            $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
+            . 'isnull(p.PesoPromedio, 0) pesoPromedio, pr.Precio precio, p.ValorImpuesto impuesto,'
+            . 'p.Pesado pesado, isnull(p.PesoMinimo, 0) pesoMinimo,'
+            . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
+            . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
+            . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
+            . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta,p.Ean,1 cantidad "
+            . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
+            . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.Ean = '$codigoBarras' "
+            . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc  ");
+        }
 
         if(count($producto) == 0)
         {
