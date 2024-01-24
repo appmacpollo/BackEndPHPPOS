@@ -152,7 +152,7 @@ class ImprimirController extends Controller
         . "    select isnull(i.CodIva, '') CodIva, isnull(i.Valor, 0) Iva, "
         . "    case when f.Degustacion = 'X' then fd.ValorProducto "
         . "    else (fd.ValorProducto - fd.ValorDescuento - fd.ValorDescuentoConvenio) end Base,  "
-        . "    fd.ValorImpuesto Impuesto, i.Descripcion Descripcion "
+        . "    fd.ValorImpuesto Impuesto, CASE WHEN isnull(i.Valor, 0) = 8 AND P.GrupoMateriales = 90 THEN 'IMPUESTO AL CONSUMO' ELSE i.Descripcion END Descripcion "
         . "    from Facturas f inner join FacturasDetalle fd on f.Factura = fd.Factura "
         . "    and f.ClaseFactura = fd.ClaseFactura and f.PrefijoFactura = fd.PrefijoFactura "
         . "    and f.Maquina = fd.Maquina "
