@@ -144,6 +144,8 @@ class ImprimirController extends Controller
         {
             $cabeceraFactura[0]->detalleFactura = $detalleFactura;
         }
+        $parametrosDetalle = ["factura" => $factura, "clase" => $clase, "prefijo" => $prefijo, "maquina" => $maquina, 
+                            "factura1" => $factura, "clase1" => $clase, "prefijo1" => $prefijo, "maquina1" => $maquina];
 
         $sqlImpuestos = "select imp.CodIva, imp.Iva, sum(imp.Base) Base, sum(imp.Impuesto) Impuesto, "
         . "(select IvaDomiExpress from Parametros) IvaDomiExpress, Descripcion "
@@ -158,9 +160,26 @@ class ImprimirController extends Controller
         . "    and f.Maquina = fd.Maquina "
         . "    inner join Productos p on fd.Producto = p.Producto "
         . "    left join Impuestos i on CONCAT('IVV' , fd.PorcImpuesto) = i.Codigo "
-        . "    where fd.Factura = :factura and fd.ClaseFactura = :clase "
-        . "    and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina "
+        . "    where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
+        . "    and fd.PrefijoFactura = '$prefijo' and fd.Maquina = '$maquina' "
         . "    and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
+        . "    and GrupoMateriales not in ( select GrupoMaterialesExpress from Parametros ) "
+        . "    and indExcluido = '' "
+        . "    Union ALL "
+        . "    select isnull(i.CodIva, '') CodIva, isnull(i.Valor, 0) Iva, "
+        . "    case when f.Degustacion = 'X' then fd.ValorProducto "
+        . "    else (fd.ValorProducto - fd.ValorDescuento - fd.ValorDescuentoConvenio) end Base,  "
+        . "    fd.ValorImpConsumo Impuesto, CASE WHEN isnull(i.Valor, 0) = 8 AND P.GrupoMateriales = 90 THEN 'IMPUESTO AL CONSUMO' ELSE i.Descripcion END Descripcion "
+        . "    from Facturas f inner join FacturasDetalle fd on f.Factura = fd.Factura "
+        . "    and f.ClaseFactura = fd.ClaseFactura and f.PrefijoFactura = fd.PrefijoFactura "
+        . "    and f.Maquina = fd.Maquina "
+        . "    inner join Productos p on fd.Producto = p.Producto "
+        . "    inner join Impuestos i on CONCAT('CON' , fd.PorcImpConsumo) = i.Codigo "
+        . "    where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
+        . "    and fd.PrefijoFactura = '$prefijo' and fd.Maquina = '$maquina' "
+        . "    and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
+        . "    and GrupoMateriales in ( select GrupoMaterialesExpress from Parametros ) "
+        . "    and indExcluido = '' "
         . "    Union ALL "
         . "    select isnull(i.CodIva, '') CodIva, isnull(i.Valor, 0) Iva, "
         . "    case when f.Degustacion = 'X' then fd.ValorProducto "
@@ -171,13 +190,28 @@ class ImprimirController extends Controller
         . "    and f.Maquina = fd.Maquina "
         . "    inner join Productos p on fd.Producto = p.Producto "
         . "    inner join Impuestos i on CONCAT('ULT' ,fd.PorcImpUltraprocesado) = i.Codigo "
-        . "    where fd.Factura = :factura1 and fd.ClaseFactura = :clase1 "
-        . "    and fd.PrefijoFactura = :prefijo1 and fd.Maquina = :maquina1 "
+        . "    where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
+        . "    and fd.PrefijoFactura = '$prefijo' and fd.Maquina = '$maquina' "
         . "    and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
+        . "    and indExcluido = '' "
+        . "    Union ALL "
+        . "    select isnull(i.CodIva, '') CodIva, isnull(i.Valor, 0) Iva, "
+        . "    case when f.Degustacion = 'X' then fd.ValorProducto "
+        . "    else (fd.ValorProducto - fd.ValorDescuento - fd.ValorDescuentoConvenio) end Base,  "
+        . "    fd.ValorImpUltraprocesado Impuesto, i.Descripcion Descripcion "
+        . "    from Facturas f inner join FacturasDetalle fd on f.Factura = fd.Factura "
+        . "    and f.ClaseFactura = fd.ClaseFactura and f.PrefijoFactura = fd.PrefijoFactura "
+        . "    and f.Maquina = fd.Maquina "
+        . "    inner join Productos p on fd.Producto = p.Producto "
+        . "    inner join Impuestos i on CONCAT('EXC' , fd.PorcImpuesto) = i.Codigo "
+        . "    where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
+        . "    and fd.PrefijoFactura = '$prefijo' and fd.Maquina = '$maquina' "
+        . "    and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
+        . "    and indExcluido = 'X' "
         . ") imp "
         . "where imp.CodIva <> '' group by imp.CodIva, imp.Iva, imp.Descripcion";
 
-        $impuesto = DB::connection($conexion)->select($sqlImpuestos, $parametrosDetalle);
+        $impuesto = DB::connection($conexion)->select($sqlImpuestos);
 
         $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorProducto Impuesto, '' IvaDomiExpress, 'INC Bolsa Plástica:' Descripcion "
         . "from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto "

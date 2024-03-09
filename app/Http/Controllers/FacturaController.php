@@ -32,6 +32,7 @@ class FacturaController extends Controller
                 'message' => "Valores no encontrados",
                 'valorPago' => 0,
                 'valorImpuesto' => 0,
+                'valorInc' => 0,
             ], 200);
         }
 
@@ -60,6 +61,7 @@ class FacturaController extends Controller
                 'message' => "Lo sentimos, No se encontro una resolucion valida.",
                 'valorPago' => 0,
                 'valorImpuesto' => 0,
+                'valorInc' => 0,
             ], 200);
         }
 
@@ -70,6 +72,7 @@ class FacturaController extends Controller
                 'message' => "Lo sentimos, El consecutivo fuera del rango .",
                 'valorPago' => 0,
                 'valorImpuesto' => 0,
+                'valorInc' => 0,
             ], 200);
         }
 
@@ -77,21 +80,30 @@ class FacturaController extends Controller
 
         $valorPago = 0;
         $valorImpuesto = 0;
+        $valorInc = 0;
         
         if(count($items) > 0)
         {
             foreach ($items as $value)
             {
                 $valorPago += $value['valor'] - $value['descuento'];
-                $valorImpuesto += $value['iva'] + $value['ivaUltra'];
+                if($value['indExpress'] == 'X') {
+                    $valorInc += $value['iva'] + $value['ivaUltra'];
+                    $valorImpuesto += 0;
+                }
+                else {
+                    $valorInc += 0;
+                    $valorImpuesto += $value['iva'] + $value['ivaUltra'];
+                }
             }
         }
 
         return response()->json([
             'status' => true,
             'message' => "Valores Calculados",
-            'valorPago' => $valorPago + $valorImpuesto ,
+            'valorPago' => $valorPago + $valorImpuesto + $valorInc ,
             'valorImpuesto' => $valorImpuesto,
+            'valorInc' => $valorInc,
         ], 200);
     }
 
@@ -288,6 +300,21 @@ class FacturaController extends Controller
 
             foreach ($items as $value)
             {
+                if($value['indExpress'] != 'X')
+                {
+                    $iva = $value['iva'];
+                    $impuesto = $value['impuesto'];
+                    $PorcImpConsumo = 0 ;
+                    $ValorImpConsumo = 0 ;
+                }
+                else
+                {
+                    $iva = 0;
+                    $impuesto = 0;
+                    $PorcImpConsumo = $value['impuesto'];
+                    $ValorImpConsumo = $value['iva'];
+                }
+
                 DB::connection('sqlsrv')->table('FacturasDetalle')->insert([
                     'Factura' => $factura,
                     'ClaseFactura' => $claseFactura,
@@ -300,16 +327,18 @@ class FacturaController extends Controller
                     'Kilos' => $value['pesoPromedio'],
                     'ValorProducto' => $value['valor'],
                     'ValorDescuento' => $value['descuento'],
-                    'ValorImpuesto' => $value['iva'],
+                    'ValorImpuesto' => $iva,
                     'Precio' => $value['precio'],
                     'ValorOferta' => $value['valorOferta'],
                     'SaborBebida' => '',
                     'Empaque' => '',
-                    'PorcImpuesto' => $value['impuesto'],
+                    'PorcImpuesto' => $impuesto,
                     'ClaseDescuento' => $value['claseDescuento'],
                     'ValorDescuentoConvenio' => 0,
                     'ValorImpUltraprocesado' => $value['ivaUltra'],
                     'PorcImpUltraprocesado' => $value['impProcesado'],
+                    'ValorImpConsumo' => $ValorImpConsumo,
+                    'PorcImpConsumo' => $PorcImpConsumo,
                 ]);
 
                 $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'];
@@ -447,6 +476,7 @@ class FacturaController extends Controller
                 $existencias = $value->existencias;
                 $existenciasK = $value->existenciasK;
                 $impProcesado = $value->impProcesado;
+                $indExpress = $value->indExpress;
             }
 
             if($express == false && $lpesado == 'X' )
@@ -457,7 +487,7 @@ class FacturaController extends Controller
                 } 
                 if(floatval($precio) != floatval($lprecio))
                 { 
-                    $precio = ($lprecio > 0) ? $lprecio : $precio ;
+                    //$precio = ($lprecio > 0) ? $lprecio : $precio ;
                 } 
             }
 
@@ -520,7 +550,8 @@ class FacturaController extends Controller
             $facturacion[$i]['ivaUltra'] = $ivaUltra;
             $facturacion[$i]['claseDescuento'] = $claseDescuento;
             $facturacion[$i]['oferta'] = $lOferta;
-            $facturacion[$i]['valorOferta'] = $valorOferta;            
+            $facturacion[$i]['valorOferta'] = $valorOferta;
+            $facturacion[$i]['indExpress'] = $indExpress;            
         }
         return $facturacion;
     }
@@ -1021,7 +1052,7 @@ class FacturaController extends Controller
                 .' isnull(p.Existencias, 0) existencias,p.UnidadMedidaVenta '
                 .' FROM Combos c '
                 .' inner join Productos p on c.Componente = p.Producto '
-                ." WHERE c.Estado = 'A' AND c.Combo = '". $value['producto']."' "
+                ." WHERE c.Estado = 'A' AND c.Combo = '". $value['producto']."' and c.EmpaqueAlmacen = 'X' and c.EmpaqueDomicilio = 'X' "
                 .' order by c.Combo');
 
             $cantidades = $value['cantidad'];

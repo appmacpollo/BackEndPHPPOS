@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 
 class DatafonoController extends Controller
 {
-    public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura,$express) {
+    public function EnviarADatafono($valorTotal, $valorImpuestos, $abreviatura,$express,$valorInc) {
         $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ;   
         $express = ($this->is_true($express) == true ) ? true : false ;   
         $maquina = env('maquina');
@@ -29,8 +29,6 @@ class DatafonoController extends Controller
         $datos = $ComunController->DatosGenerales($express);
         foreach ($datos['parametros'] as $value) {
             $usuario = $value->Usuario;
-            $fechaProceso = $value->FechaProceso;
-            $turno = $value->Turno;
         }
 
         $CCVendedor = $usuario;
@@ -44,6 +42,7 @@ class DatafonoController extends Controller
         $linea .= str_pad($maquina, 10, " ", STR_PAD_RIGHT).$separador;
         $linea .= str_pad($tipoMovimiento[0] -> cons, 10, " ", STR_PAD_RIGHT).$separador; 
         $linea .= str_pad($CCVendedor, 12, " ", STR_PAD_RIGHT).$separador; 
+        $linea .= str_pad($valorInc, 12, " ", STR_PAD_RIGHT).$separador;
         $linea .= $this->getValidacionLRC($linea);
 
         $respuesta = $this->EntradaDatafono($maquina, $linea);

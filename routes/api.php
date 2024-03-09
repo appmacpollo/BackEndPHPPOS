@@ -33,7 +33,7 @@ Route::post('/Autorizacion', [ComunController::class, 'Autorizacion']);
 Route::get('/ImprimirAnulacionFactura/{factura}/{clase}/{prefijo}/{maquina}/{express}', [ImprimirController::class, 'ImprimirAnulacionFactura']);
 
 //Datafono
-Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}', [DatafonoController::class, 'EnviarADatafono']);
+Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}/{valorInc}', [DatafonoController::class, 'EnviarADatafono']);
 Route::get('/leerArchivoSalidaDatafono', [DatafonoController::class, 'SalidaDatafono']);
 Route::post('/AnulacionDatafono', [DatafonoController::class, 'AnulacionDatafono']);
 
