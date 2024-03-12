@@ -995,7 +995,7 @@ class FacturaController extends Controller
             .'fd.ValorDescuento valorDescuento, fd.ValorImpuesto valorImpuesto, fd.ValorOferta valorOferta, '
             ."fd.SaborBebida saborBebida,isnull(i.CodIva, '') codIva, p.Ean ean, fd.Empaque empaque, "
             ."fd.PorcImpuesto porcImpuesto, isnull(fd.ClaseDescuento, '') claseDescuento, "
-            .'fd.ValorDescuentoConvenio valDescuentoConvenio, fd.ValorImpUltraprocesado impUltra '
+            .'fd.ValorDescuentoConvenio valDescuentoConvenio, fd.ValorImpUltraprocesado impUltra, p.Pesado Pesado '
             .'from Facturas f inner join FacturasDetalle fd on f.Factura = fd.Factura '
             .'and f.ClaseFactura = fd.ClaseFactura and f.PrefijoFactura = fd.PrefijoFactura '
             .'and f.Maquina = fd.Maquina '
@@ -1009,7 +1009,10 @@ class FacturaController extends Controller
             $producto = $values->producto;
             $cantidad = $values->unidades;
             $oferta = $values->oferta;
-            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta);
+            $kilos = $values->kilos;
+            $precio = $values->precio;
+            $pesado = $values->Pesado;
+            $productos[] = array('id' => $i, 'producto' => $producto, 'cantidad' => $cantidad, 'oferta' => $oferta, 'kilos' => $kilos, 'precio' => $precio, 'pesado' => $pesado);
             $i++;
         }
 
