@@ -107,7 +107,7 @@ class ProductoController extends Controller
 
     public function ValidarCaja($express)
     {
-        $sqlsrv = ($this->is_true($express) == true ) ? 'sqlsrv2' : 'sqlsrv' ;   
+        $sqlsrv = 'sqlsrv' ;   
         //Validar que no este en la ventana de cierre
         $Ventanas = DB::connection($sqlsrv)->select("SELECT * FROM Ventanas where Opcion in ('INF_CIPRO','INV_FIS') ");
         if(count($Ventanas) >= 1)
@@ -149,10 +149,21 @@ class ProductoController extends Controller
             ], 200);
         }
 
+        $usuario = DB::connection($sqlsrv)->select("select * from Caja where fecha = (select FechaProceso from Parametros) AND FechaHasta is null AND Usuario != 'CIERRE' AND Maquina = '$maquina' ");
+        if(count($usuario) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "No se encontro un usuario valido para la caja Numero 02",
+            ], 200);
+        }
+
         return response()->json([
             'status' => true,
             'message' => "Se encuentra todo correcto",
         ], 200);
+
+
 
     }
 
