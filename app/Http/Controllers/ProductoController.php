@@ -12,9 +12,9 @@ class ProductoController extends Controller
         $grupoPrecios = env('grupoPrecios');
         $codigoBarras = $ean; 
 
-        if (strpos($codigoBarras, '|') !== false) 
+        if (strpos($codigoBarras, ':') !== false) 
         {
-            $posiciones = explode("|", $codigoBarras);
+            $posiciones = explode(":", $codigoBarras);
             $codigo = $posiciones[0];
             $unidades = $posiciones[1];
             $kilos = $posiciones[2];
