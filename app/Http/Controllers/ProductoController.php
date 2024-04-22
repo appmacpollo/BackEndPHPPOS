@@ -27,7 +27,7 @@ class ProductoController extends Controller
             . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
             . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
             . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta, isnull(p.Ean, p.Producto) Ean ,'$unidades' cantidad, "
-            . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress "
+            . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress, p.ValorImpBolsa as valorImpBolsa "
             . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
             . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.producto = '$codigo' "
             . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc  ");
@@ -52,7 +52,7 @@ class ProductoController extends Controller
             . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
             . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
             . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta,p.Ean,1 cantidad, "
-            . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress "
+            . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress, p.ValorImpBolsa as valorImpBolsa "
             . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
             . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.Ean = '$codigoBarras' "
             . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc ");
@@ -177,10 +177,10 @@ class ProductoController extends Controller
             . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
             . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
             . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta, "
-            . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress "
+            . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress, p.ValorImpBolsa as valorImpBolsa "
             . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
             . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.producto = '$codId' "
-            . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 ");
+            . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and CASE WHEN GrupoArticulos in (select FamiliaEmpaques from Parametros) THEN 1 ELSE CASE WHEN pr.Precio > 0 THEN 1 ELSE 0 END END = 1");
 
         $descuento = DB::connection('sqlsrv')->select('SELECT top 1 valor,ClaseDescuento,TipoDescuento '
             . 'FROM Descuentos '
@@ -252,12 +252,12 @@ class ProductoController extends Controller
         .'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias, '
         ."(select case when count(Componente) = 0 then '' else 'X' end Com from Combos "
         ."where Combo = p.Producto and Estado = 'A') combo, isnull(p.ExistenciasK, 0) existenciasK, "
-        .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos '
+        .'ValorImpUltraprocesado as impProcesado , p.GrupoArticulos, p.ValorImpBolsa as valorImpBolsa '
         .'from Productos p left join Precios pr on p.Producto = pr.Producto '
         .'left join PesosUnidadesAlternas pua on pr.Producto = pua.Producto and pr.UnidadMedidaVenta = pua.UnidadMedidaVenta '
         .'inner join ProductosPortal on ProductosPortal.material = p.producto '
         ."where ProductosPortal.categoria = '$grupo' "
-        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 and GrupoPrecios = '$grupoPrecios' " ) ;
+        ."and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and CASE WHEN GrupoArticulos in (select FamiliaEmpaques from Parametros) THEN 1 ELSE CASE WHEN pr.Precio > 0 THEN 1 ELSE 0 END END = 1, and GrupoPrecios = '$grupoPrecios' " ) ;
         if(count($producto) == 0)
         {
             return response()->json([
@@ -340,7 +340,7 @@ class ProductoController extends Controller
             $cantidad = $values['cantidad'];
 
             $productoOfertas = DB::connection($sqlsrv)->select("SELECT ofertas.Producto, FLOOR($cantidad/Cantidad) Cantidad,ProductoOferta,"
-            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta,Productos.Nombre as Nombre "
+            ." (FLOOR($cantidad/Cantidad) * CantidadOferta) CantidadOferta, Productos.Nombre as Nombre "
             . 'FROM ofertas '
             . 'inner join OfertasDetalle on ofertas.Oferta = OfertasDetalle.Oferta '
             . 'inner join Productos on OfertasDetalle.ProductoOferta = Productos.Producto '
@@ -472,10 +472,10 @@ class ProductoController extends Controller
         . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
         . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
         . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
-        . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta "
+        . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta, p.ValorImpBolsa as valorImpBolsa "
         . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
         . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.GrupoArticulos = ( select FamiliaEmpaques from Parametros )  "
-        . " and pr.Estado = 'A' and p.Estado = 'A' and pr.Precio > 0 "
+        . " and pr.Estado = 'A' and p.Estado = 'A' and CASE WHEN GrupoArticulos in (select FamiliaEmpaques from Parametros) THEN 1 ELSE CASE WHEN pr.Precio > 0 THEN 1 ELSE 0 END END = 1"
         . ' order by Existencias desc ');
 
         $producto2 = DB::connection($conexion)->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
@@ -484,10 +484,10 @@ class ProductoController extends Controller
         . 'isnull(p.PesoMaximo, 0) pesoMaximo, p.ToleranciaMinima tolMinima,'
         . 'p.ToleranciaMaxima tolMaxima, isnull(p.Existencias, 0) existencias,'
         . "(select case when count(Componente) = 0 then '' else 'X' end Com from Combos where Combo = p.Producto and Estado = 'A') combo, "
-        . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta "
+        . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta, p.ValorImpBolsa as valorImpBolsa "
         . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
         . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.Nombre like '%BOLSA%ECOLOGICA%' "
-        . " and pr.Estado = 'A' and p.Estado = 'A' and pr.Precio > 0 "
+        . " and pr.Estado = 'A' and p.Estado = 'A' and CASE WHEN GrupoArticulos in (select FamiliaEmpaques from Parametros) THEN 1 ELSE CASE WHEN pr.Precio > 0 THEN 1 ELSE 0 END END = 1"
         . ' order by Existencias desc ');
 
         $productos = array_merge($producto, $producto2);
