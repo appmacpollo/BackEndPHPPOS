@@ -224,7 +224,7 @@ class ImprimirController extends Controller
 
         $impuesto = DB::connection($conexion)->select($sqlImpuestos);
 
-        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorImpConsumo AS Impuesto, "
+        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorImpConsumo as Impuesto, "
             . "'' IvaDomiExpress, 'INC Bolsa Plástica:' Descripcion "
             . "from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto "
             . "where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
@@ -562,7 +562,8 @@ class ImprimirController extends Controller
 
         $impuesto = DB::connection($conexion)->select($sqlImpuestos, $parametrosDetalle);
 
-        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorProducto Impuesto, '' IvaDomiExpress, 'INC Bolsa Plástica:' Descripcion "
+        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorImpConsumo as Impuesto, "
+            . "'' IvaDomiExpress, 'INC Bolsa Plástica:' Descripcion "
             . "from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto "
             . "where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
             . "and fd.PrefijoFactura = '$prefijo' and fd.Maquina = '$maquina' "
