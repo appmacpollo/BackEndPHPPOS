@@ -84,10 +84,10 @@ class FacturaController extends Controller
             foreach ($items as $value) {
                 $valorPago += $value['valor'] - $value['descuento'];
                 if ($value['indExpress'] == 'X') {
-                    $valorInc += $value['iva'] + $value['ivaUltra'] + $value['valorImpBolsa'] * $value['cantidad'];
+                    $valorInc += $value['iva'] + $value['ivaUltra'] + $value['impConsumo'];
                     $valorImpuesto += 0;
                 } else {
-                    $valorInc += $value['valorImpBolsa'] * $value['cantidad'];
+                    $valorInc += $value['impConsumo'];
                     $valorImpuesto += $value['iva'] + $value['ivaUltra'];
                 }
             }
@@ -295,12 +295,12 @@ class FacturaController extends Controller
                     $iva = $value['iva'];
                     $impuesto = $value['impuesto'];
                     $PorcImpConsumo = 0;
-                    $ValorImpConsumo = $value['valorImpBolsa']*$value['cantidad'];
+                    $valorImpConsumo = $value['impConsumo'];
                 } else {
                     $iva = 0;
                     $impuesto = 0;
                     $PorcImpConsumo = $value['impuesto'];
-                    $ValorImpConsumo = $value['iva'] + $value['valorImpBolsa']*$value['cantidad'];
+                    $valorImpConsumo = $value['iva'] + $value['impConsumo'];
                 }
 
                 DB::connection('sqlsrv')->table('FacturasDetalle')->insert([
@@ -325,11 +325,11 @@ class FacturaController extends Controller
                     'ValorDescuentoConvenio' => 0,
                     'ValorImpUltraprocesado' => $value['ivaUltra'],
                     'PorcImpUltraprocesado' => $value['impProcesado'],
-                    'ValorImpConsumo' => $ValorImpConsumo,
+                    'ValorImpConsumo' => $valorImpConsumo,
                     'PorcImpConsumo' => $PorcImpConsumo,
                 ]);
 
-                $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'];
+                $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'] + $value['impConsumo'];
             }
 
             $ind_inventario = $this->procesarExistenciasProductos($items, false, "-");
@@ -502,6 +502,7 @@ class FacturaController extends Controller
             $descuento = $this->calcularDescuentoProducto($valor, $valorDescuento, $tipoDescuento);
             $iva = $this->calcularImpuestoProducto($valor, $descuento, $impuesto);
             $ivaUltra = $this->calcularImpuestoProducto($valor, $descuento, $impProcesado);
+            $impConsumo = $this->calcularImpuestoFijoProducto($valorImpBolsa, $cantidad);
 
             $valorOferta = 0;
             if ($lOferta == 'X') {
@@ -529,11 +530,11 @@ class FacturaController extends Controller
             $facturacion[$i]['descuento'] = $descuento;
             $facturacion[$i]['iva'] = $iva;
             $facturacion[$i]['ivaUltra'] = $ivaUltra;
+            $facturacion[$i]['impConsumo'] = $impConsumo;
             $facturacion[$i]['claseDescuento'] = $claseDescuento;
             $facturacion[$i]['oferta'] = $lOferta;
             $facturacion[$i]['valorOferta'] = $valorOferta;
             $facturacion[$i]['indExpress'] = $indExpress;
-            $facturacion[$i]['valorImpBolsa'] = $valorImpBolsa;
         }
         return $facturacion;
     }
@@ -542,6 +543,12 @@ class FacturaController extends Controller
     {
         $valor = round(($valor - $descuento) * $imp / 100);
         return $valor;
+    }
+
+    public function calcularImpuestoFijoProducto($imp, $cantidad)
+    {
+        $total_impuesto = round($imp * $cantidad);
+        return $total_impuesto;
     }
 
     public function calcularValorProducto($unidad, $cantidad, $kilos, $precio)
@@ -821,7 +828,7 @@ class FacturaController extends Controller
                 'PorcImpUltraprocesado' => $value['impProcesado'],
             ]);
 
-            $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'];
+            $valorPago += ($value['valor'] - $value['descuento']) + $value['iva'] + $value['ivaUltra'] + $value['impConsumo'];
         }
 
         $resolucionFacturas = DB::connection('sqlsrv2')->select('SELECT top 1 Consecutivo,TipoMovimiento '
