@@ -240,7 +240,20 @@ class ImprimirController extends Controller
             }
         }
 
-        $impuestos = array_merge($impuesto, $impuestosBolsa);
+        $impuestoBolsaINC = (Object) [
+            "CodIva" => "",
+            "Iva" => "",
+            "Base" => "",
+            "Impuesto" => 0,
+            "IvaDomiExpress" => "",
+            "Descripcion" => "INC Bolsa Plástica:"
+        ];
+
+        foreach ($impuestosBolsa as $impuestoBolsa) {
+            $impuestoBolsaINC->Impuesto += intval($impuestoBolsa->Impuesto);
+        }
+
+        $impuestos = array_merge($impuesto, array($impuestoBolsaINC));
 
         if (count($impuestos) > 0) {
             $cabeceraFactura[0]->totalImpuestos = $impuestos;
@@ -578,7 +591,20 @@ class ImprimirController extends Controller
             }
         }
 
-        $impuestos = array_merge($impuesto, $impuestosBolsa);
+        $impuestoBolsaINC = (Object) [
+            "CodIva" => "",
+            "Iva" => "",
+            "Base" => "",
+            "Impuesto" => 0,
+            "IvaDomiExpress" => "",
+            "Descripcion" => "INC Bolsa Plástica:"
+        ];
+
+        foreach ($impuestosBolsa as $impuestoBolsa) {
+            $impuestoBolsaINC->Impuesto += intval($impuestoBolsa->Impuesto);
+        }
+
+        $impuestos = array_merge($impuesto, array($impuestoBolsaINC));
 
         if (count($impuestos) > 0) {
             $cabeceraFactura[0]->totalImpuestos = $impuestos;
