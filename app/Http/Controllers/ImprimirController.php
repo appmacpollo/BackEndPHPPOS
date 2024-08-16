@@ -294,7 +294,8 @@ class ImprimirController extends Controller
         $FacturasCufe = DB::connection($conexion)->select($SqlFacturasCufe, $parametros);
 
         $SqlFacturasDetalleCufe = 'select isnull(sum(fd.ValorProducto), 0) valorProducto, '
-            . 'isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto + fd.ValorImpUltraprocesado), 0) valorImpuesto '
+            . ' isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto + fd.ValorImpConsumo), 0) valorImpuesto, '
+            . ' isnull(sum(fd.ValorImpUltraprocesado), 0) ValorImpUltra'
             . ' from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
             . " where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina "
             . " and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) ";
@@ -317,7 +318,7 @@ class ImprimirController extends Controller
         $degusta = false;
 
         $fac = $fec = $hor = $docAdq = $cla = "";
-        $vf = $vi1 = $vi2 = $vi3 = $ia = $vb = 0;
+        $vf = $vi1 = $vi2 = $vi3 = $ia = $vb = $viUlt = 0;
 
         $SqlCentroLogisto = "select CentroLogistico from Parametros";
         $CentroLogisto = DB::connection($conexion)->select($SqlCentroLogisto);
@@ -328,7 +329,7 @@ class ImprimirController extends Controller
 
                 $fac = $value->prefijo . $value->factura;
                 $fec = date('Y-m-d', strtotime($value->fechaNovedad));
-                $hor = date('H:m:s', strtotime($value->fechaNovedad)) . "-05:00";
+                $hor = date('H:i:s', strtotime($value->fechaNovedad)) . "-05:00";
 
                 if ($value->identificado == "X" || $value->enviaFacEle == 'X') {
                     if ($value->gestionado == 'S')
@@ -338,7 +339,7 @@ class ImprimirController extends Controller
                 } else
                     $docAdq = env('CLI_DOC_MOS');
 
-                $cla = $value->softwarePin;
+                $cla = $value->claveTecnica;
 
                 if ($value->domicilioGratis == "X") {
                     $ia = $value->ivaDomicilio;
@@ -356,6 +357,7 @@ class ImprimirController extends Controller
                 $vf += ($value->valorProducto - $value->valorDescuento);
                 $vi1 += $express ? 0 : $value->valorImpuesto;
                 $vi2 += $express ? $value->valorImpuesto : 0;
+                $viUlt +=$value->ValorImpUltra;
             }
         }
 
@@ -377,12 +379,12 @@ class ImprimirController extends Controller
         $vi1 += $express ? 0 : $ia;
         $vi2 += $express ? $ia : 0;
 
-        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $vb - $ajuste - $cuponV - $ia);
+        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $viUlt + $vb - $ajuste - $cuponV - $ia);
 
         $valFac = intval($vf) . ".00";
         $valImp1 = intval($vi1) . ".00";
         $valImp2 = intval($vi2) . ".00";
-        $valImp3 = intval($vi3) . ".00";
+        $valImp3 = intval($vi3 + $viUlt) . ".00";
         $valTot = intval($vt) . ".00";
 
         $SqlNitEmp = "select isnull(NitEmpresa, '') NitEmpresa from Parametros";
@@ -405,7 +407,7 @@ class ImprimirController extends Controller
         $SqlRutaDian = " select isnull(RutaDian, '') rutaDian from Parametros ";
         $RutaDian = DB::connection($conexion)->select($SqlRutaDian);
 
-        $vio = $vi2 + $vi3;
+        $vio = $vi2 + $vi3 + $viUlt;
         $valImpOtros = intval($vio) . ".00";
 
         $qr = "NumFac:" . $fac
@@ -417,7 +419,7 @@ class ImprimirController extends Controller
             . "ValIva:" . $valImp1
             . "ValOtroIm:" . $valImpOtros
             . "ValTolFac:" . $valTot
-            . "CUFE:" . $cufe
+            . "CUFE:" . $cufe . " "
             . $RutaDian[0]->rutaDian . $cufe;
 
         $return = array('cufe' => $cufe, 'qr' => $qr);
