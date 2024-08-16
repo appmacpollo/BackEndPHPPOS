@@ -179,16 +179,23 @@ class FacturaController extends Controller
             foreach ($datos['ClientesDocGrupoPrecios'] as $value) {
                 $cliente = $value->cliente;
                 $documento = $value->documento;
-                $nombre = $value->nombre;
+                $Nombre = $value->nombre;
                 $telefono = $value->telefono;
-                $direccion = $value->direccion;
+                //$direccion = $value->direccion;
                 $barrio = $value->barrio;
             }
+
+            $cliente = $data['cliente']['Cliente'] ;
+            $documento = $data['cliente']['DocumentoIdentidad'] ;
+            $Nombre = $data['cliente']['Nombre'] ;
+            $telefono = $data['cliente']['Telefono'] ;
+            $tipoDocumento = $data['cliente']['TipoDocumento'] ;
 
             foreach ($datos['parametros'] as $value) {
                 $usuario = $value->Usuario;
                 $fechaProceso = $value->FechaProceso;
                 $turno = $value->Turno;
+                if($data['cliente']['Cliente'] == "") $cliente = $value->ConsecutivoClientes;
             }
 
             $resolucionFacturas = DB::connection('sqlsrv')->select('SELECT top 1 PrefijoFactura prefijo, Resolucion resolucion, Consecutivo consecutivo, NumeroDesde desde, '
@@ -246,6 +253,57 @@ class FacturaController extends Controller
 
             $factura = $consecutivo;
 
+            if($data['cliente']['Cliente'] == "")
+            {
+                DB::connection('sqlsrv')->table('Clientes')->insert([
+                    'Cliente' => $cliente,
+                    'Empleado' => "",
+                    'Empresa' => "00",
+                    'Tratamiento' => "",
+                    'Sexo' => "",
+                    'DocumentoIdentidad' => $documento,
+                    'Sucursal' => '00',
+                    'Nombre' => $Nombre,
+                    'Direccion' => $direccion,
+                    'Barrio' => $barrio,
+                    'Telefono' => $telefono,
+                    'Celular' => $telefono,
+                    'GrupoPrecios' => $grupoPrecios,
+                    'TipoNegocio' => "044",
+                    'Email' => "",
+                    'Observaciones' => "Cliente creado desde el Kiosco",
+                    'FrecuenciaCompra' => "",
+                    'FechaUltVenta' => date('d.m.Y H:i:s'),
+                    'CallCenter' => "",
+                    'ClienteDiario' => "",
+                    'HorarioLlamada' => "12:00:00 AM - 12:00:00 AM",
+                    'CodigoSAP' => "",
+                    'FechaProxLlamada' => "1900-01-01",
+                    'CondicionPago' => "PI",
+                    'ValorCupo' => "0",
+                    'FechaDiaAnterior' => "1900-01-01",
+                    'VentasDiaAnterior' => "",
+                    'BloqueoCartera' => "",
+                    'Identificado' => "",
+                    'PagaDomicilio' => "",
+                    'FechaCrea' => date('d.m.Y H:i:s'),
+                    'UsuarioCrea' => $usuario,
+                    'FechaModifica' => date('d.m.Y H:i:s'),
+                    'UsuarioModifica' => $usuario,
+                    'Gestionado' => "N",
+                    'Estado' => "A",
+                    'DocumentoVerificado' => $documento,
+                    'BarrioCliente' => "",
+                    'OrigenCliente' => "K",
+                    'OrigenUltVenta' => "K",
+                    'Ciudad' => $ciudad,
+                    'TipoDocumento' => $tipoDocumento
+                ]);
+            }
+
+            DB::connection('sqlsrv')->table('Parametros')
+                ->update(['ConsecutivoClientes' => $cliente + 1]);
+            
             DB::connection('sqlsrv')->table('Facturas')->insert([
                 'Factura' => $factura,
                 'ClaseFactura' => $claseFactura,
@@ -282,7 +340,7 @@ class FacturaController extends Controller
                 'DiasPlazo' => 0,
                 'DomicilioGratis' => '',
                 'Atendio' => $usuario,
-                'EnviaFacEle' => '',
+                'EnviaFacEle' => 'X',
                 'Enviado' => '',
                 'IndConvenio' => 'N',
                 'DocumentoConvenio' => '',
