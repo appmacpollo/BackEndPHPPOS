@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class ComunController extends Controller
 {
@@ -28,7 +29,7 @@ class ComunController extends Controller
         ."from Clientes where DocumentoIdentidad = '$documento' and GrupoPrecios like '$grupoPrecios' "
         .'order by Estado, Cliente' );
 
-        $parametros = DB::connection($conexion)->select('SELECT TOP 1 Usuario,FechaProceso,Turno,* '
+        $parametros = DB::connection($conexion)->select('SELECT TOP 1 Usuario,FechaProceso,Turno,ConsecutivoClientes '
         .'from caja '
         .'inner join Parametros on Parametros.FechaProceso = caja.fecha '
         ."where Maquina = '$maquina' and FechaHasta is null ");
@@ -63,5 +64,75 @@ class ComunController extends Controller
             ], 200);
         }
 
+    }
+
+    public function ConsultarCliente(Request $request)
+    {
+        $data = $request->json()->all(); 
+        $sqlsrv = 'sqlsrv' ;     
+        $documentoIdentidad = $data['consulta']['documentoIdentidad'] ;
+
+        $clientes = DB::connection($sqlsrv)->select('SELECT Top 1 Cliente,DocumentoIdentidad,Clientes.Nombre,Telefono,TiposDocumentos.TipoDocumento TipoDocumento '
+                    .'from Clientes '
+                    .'inner join TiposDocumentos on TiposDocumentos.TipoDocumento = Clientes.TipoDocumento '
+                    ." WHERE DocumentoIdentidad = '$documentoIdentidad' and GrupoPrecios = '27' "
+                    .' order by Clientes.Estado asc ' );
+
+        if(count($clientes) == 0)
+        {
+            // Configurar la autenticación básica
+            $username = 'apiRISK@macpollo.com';
+            $password = 'twNQ1uaUi3*';
+            $basicAuth = base64_encode("$username:$password");
+            
+            // Definir los datos a enviar en la solicitud
+            $tipoDoc = 'CC';
+            
+            // Enviar la solicitud POST
+            $response = Http::withHeaders([
+                    'Authorization' => 'Basic ' . $basicAuth,
+                    'Content-Type' => 'application/json',
+                ])
+                ->timeout(30) // Establece el tiempo de espera en segundos
+                ->withOptions([
+                    'verify' => false, // Desactivar la verificación del certificado SSL 
+                ])
+                ->post('https://app.compliance.com.co/validador/ws/NombreService/consultarNombre', [
+                    'documento' => $documentoIdentidad,
+                    'tipoDocumento' => $tipoDoc,
+                ]);
+            
+            // Manejo de la respuesta
+            if ($response->successful()) {
+                $data = $response->json();
+                $clientes['Cliente'] = '';
+                $clientes['DocumentoIdentidad'] = $response['documento'];
+                $clientes['Nombre'] = $response['nombre'];
+                $clientes['Telefono'] = '';
+                $clientes['TipoDocumento'] = '13';
+
+                return response()->json([
+                    'status' => true,
+                    'message' => "Cliente Encontrado",
+                    'cliente' => $clientes
+                ], 200);
+            } else {
+                $error = $response->body();
+                $data = json_decode($error, true);
+                return response()->json([
+                    'status' => true,
+                    'message' => $data['error'] ,
+                    'cliente' =>  array()
+                ], 200);
+            }
+        }
+        else
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Cliente Encontrado",
+                'cliente' => $clientes[0]
+            ], 200);
+        }
     }
 }
