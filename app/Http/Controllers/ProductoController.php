@@ -12,12 +12,11 @@ class ProductoController extends Controller
         $grupoPrecios = env('grupoPrecios');
         $codigoBarras = $ean; 
 
-        if (strpos($codigoBarras, ':') !== false) 
+        if (str_starts_with($ean, '2')) 
         {
-            $posiciones = explode(":", $codigoBarras);
-            $codigo = $posiciones[0];
-            $unidades = $posiciones[1];
-            $kilos = $posiciones[2];
+            $codigo = substr($ean, 0, 7);
+            $unidades = 1;
+            $kilos = intval(substr($ean, 7, 5)) / 1000;
             $precio = 0;
 
             $producto = DB::connection('sqlsrv')->select('SELECT top 1 p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre,'
@@ -29,7 +28,7 @@ class ProductoController extends Controller
             . "isnull(p.ExistenciasK, 0) existenciasK, ValorImpUltraprocesado as impProcesado,'' oferta, isnull(p.Ean, p.Producto) Ean ,'$unidades' cantidad, "
             . " CASE WHEN p.GrupoMateriales = (select GrupoMaterialesExpress from Parametros) THEN 'X' ELSE ' ' END AS indExpress, p.ValorImpBolsa as valorImpBolsa "
             . 'FROM productos p INNER JOIN Precios pr on p.Producto = pr.Producto'
-            . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.producto = '$codigo' "
+            . " WHERE pr.GrupoPrecios = '$grupoPrecios' and p.Ean like '$codigo' "
             . " and pr.Estado = 'A' and p.Estado = 'A' and p.UnidadMedidaBase = 'S' and pr.Precio > 0 order by Existencias desc  ");
 
             if(count($producto) == 0)
@@ -41,7 +40,7 @@ class ProductoController extends Controller
                 ], 200);
             }
 
-            $codigoBarras = $producto[0]->Ean;
+            $codigoBarras = $producto[0]->producto;
         }
         else
         {
