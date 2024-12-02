@@ -75,7 +75,7 @@ class ComunController extends Controller
         $clientes = DB::connection($sqlsrv)->select('SELECT Top 1 Cliente,DocumentoIdentidad,Clientes.Nombre,Telefono,TiposDocumentos.TipoDocumento TipoDocumento '
                     .'from Clientes '
                     .'inner join TiposDocumentos on TiposDocumentos.TipoDocumento = Clientes.TipoDocumento '
-                    ." WHERE DocumentoIdentidad = '$documentoIdentidad' and GrupoPrecios = '27' "
+                    ." WHERE DocumentoIdentidad = '$documentoIdentidad' and GrupoPrecios in ('20','27') "
                     .' order by Clientes.Estado asc ' );
 
         if(count($clientes) == 0)
