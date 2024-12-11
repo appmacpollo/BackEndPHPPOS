@@ -135,4 +135,28 @@ class ComunController extends Controller
             ], 200);
         }
     }
+
+    public function datosPuntoVenta()
+    {
+        $sqlsrv = 'sqlsrv' ;     
+        $datosPunto = DB::connection($sqlsrv)->select('SELECT CentroLogistico,NombreCentroLogistico from parametros ' );
+
+        if(count($datosPunto) == 0)
+        {
+            return response()->json([
+                'status' => false,
+                'message' => "Datos NO encontrados",
+            ], 200);
+        }
+        else
+        {
+            return response()->json([
+                'status' => true,
+                'message' => "Datos encontrados",
+                'data' => $datosPunto
+            ], 200);
+        }
+
+    }
+
 }

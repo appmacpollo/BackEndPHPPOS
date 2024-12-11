@@ -32,6 +32,7 @@ Route::get('/ConsultarBolsas/{express}', [ProductoController::class, 'ConsultarB
 Route::post('/Autorizacion', [ComunController::class, 'Autorizacion']);
 Route::post('/ConsultarCliente', [ComunController::class, 'ConsultarCliente']);
 Route::get('/ImprimirAnulacionFactura/{factura}/{clase}/{prefijo}/{maquina}/{express}', [ImprimirController::class, 'ImprimirAnulacionFactura']);
+Route::get('/datosPuntoVenta', [ComunController::class, 'datosPuntoVenta']);
 
 //Datafono
 Route::get('/EnviarADatafono/{valorTotal}/{valorImpuestos}/{abreviatura}/{express}/{valorInc}', [DatafonoController::class, 'EnviarADatafono']);
