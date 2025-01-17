@@ -188,7 +188,7 @@ class FacturaController extends Controller
             $cliente = $data['cliente']['Cliente'] ;
             $documento = $data['cliente']['DocumentoIdentidad'] ;
             $Nombre = $data['cliente']['Nombre'] ;
-            $telefono = $data['cliente']['Telefono'] ;
+            //$telefono = $data['cliente']['Telefono'] ;
             $tipoDocumento = $data['cliente']['TipoDocumento'] ;
 
             foreach ($datos['parametros'] as $value) {
@@ -274,7 +274,7 @@ class FacturaController extends Controller
                     'Observaciones' => "Cliente creado desde el Kiosco",
                     'FrecuenciaCompra' => "",
                     'FechaUltVenta' => date('d.m.Y H:i:s'),
-                    'CallCenter' => "",
+                    'CallCenter' => "N",
                     'ClienteDiario' => "",
                     'HorarioLlamada' => "12:00:00 AM - 12:00:00 AM",
                     'CodigoSAP' => "",
@@ -290,7 +290,7 @@ class FacturaController extends Controller
                     'UsuarioCrea' => $usuario,
                     'FechaModifica' => date('d.m.Y H:i:s'),
                     'UsuarioModifica' => $usuario,
-                    'Gestionado' => "N",
+                    'Gestionado' => "S",
                     'Estado' => "A",
                     'DocumentoVerificado' => $documento,
                     'BarrioCliente' => "",
