@@ -10,8 +10,7 @@ class ComunController extends Controller
 {
     public function DatosGenerales($express)
     {
-        if($express) $conexion = 'sqlsrv2';
-        else $conexion = 'sqlsrv';
+        $conexion = 'sqlsrv';
         $infoFactura = DB::connection($conexion)->select('SELECT p.MensajeEmpresa empresa, p.NombreCentroLogistico centro, '
             .'p.DireccionCentroLogistico direccion, p.TelefonoCentroLogistico telefono, '
             .'p.MensajeFactura1 mensajeUno, p.MensajeFactura2 mensajeDos, p.MensajeFactura3 mensajeTres, '

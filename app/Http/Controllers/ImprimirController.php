@@ -132,7 +132,7 @@ class ImprimirController extends Controller
             . "	inner join Parametros pa on 1=1 "
             . "	where fd.Factura = :factura and fd.ClaseFactura = :clase "
             . "	and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina "
-            //. "	and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
+            . "	and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
             . "	union "
             . "	select fd.Producto, fd.UnidadMedidaVenta, p.Nombre, '' Oferta, "
             . "	fd.Unidades, fd.Kilos, 0 Precio, 0 ValorProducto, 0 ValorDescuento, 0 ValorImpuesto, 0 ValorOferta, "

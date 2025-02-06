@@ -299,11 +299,11 @@ class FacturaController extends Controller
                     'Ciudad' => $ciudad,
                     'TipoDocumento' => $tipoDocumento
                 ]);
-            }
-
-            DB::connection('sqlsrv')->table('Parametros')
+                
+                DB::connection('sqlsrv')->table('Parametros')
                 ->update(['ConsecutivoClientes' => $cliente + 1]);
-            
+            }
+           
             DB::connection('sqlsrv')->table('Facturas')->insert([
                 'Factura' => $factura,
                 'ClaseFactura' => $claseFactura,
