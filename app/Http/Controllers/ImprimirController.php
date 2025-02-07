@@ -135,12 +135,12 @@ class ImprimirController extends Controller
             . "	and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) "
             . "	union "
             . "	select fd.Producto, fd.UnidadMedidaVenta, p.Nombre, '' Oferta, "
-            . "	fd.Unidades, fd.Kilos, 0 Precio, 0 ValorProducto, 0 ValorDescuento, 0 ValorImpuesto, 0 ValorOferta, "
+            . "	fd.Unidades, fd.Kilos, 0 Precio, ( ( CASE WHEN fd.ValorImpConsumo != 0 THEN fd.ValorProducto ELSE fd.ValorImpConsumo END ) ) as ValorProducto, 0 ValorDescuento, 0 ValorImpuesto, 0 ValorOferta, "
             . "	'' SaborBebida, '' CodIva, '' Ean, fd.Empaque, 3 Orden, 'X' Mostrar, 0 ValorDomicilio, 0 DescuentoConvenio, 0 valordescConvenio, '' ImpUltra "
             . "	from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto "
             . "	where fd.Factura = :factura1 and fd.ClaseFactura = :clase1 "
             . "	and fd.PrefijoFactura = :prefijo1 and fd.Maquina = :maquina1 "
-            . "	and fd.Precio = 0 and p.GrupoArticulos in (select isnull(FamiliaEmpaques, '') from Parametros) "
+            . "	and p.GrupoArticulos in (select isnull(FamiliaEmpaques, '') from Parametros) "
             . ") p where p.Mostrar = 'X'";
         $detalleFactura = DB::connection($conexion)->select($sqlDetalle, $parametrosDetalle);
 
@@ -224,7 +224,7 @@ class ImprimirController extends Controller
 
         $impuesto = DB::connection($conexion)->select($sqlImpuestos);
 
-        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, fd.ValorImpConsumo as Impuesto, "
+        $SQLimpBolsa = "select '' CodIva, '' Iva, '' Base, ( ( CASE WHEN fd.ValorImpConsumo != 0 THEN fd.ValorImpConsumo ELSE fd.ValorProducto END ) ) as Impuesto, "
             . "'' IvaDomiExpress, 'INC Bolsa Plástica:' Descripcion "
             . "from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto "
             . "where fd.Factura = '$factura' and fd.ClaseFactura = '$clase' "
