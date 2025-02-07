@@ -361,6 +361,27 @@ class FacturaController extends Controller
                     $valorImpConsumo = $value['iva'] + $value['impConsumo'];
                 }
 
+                $valor = $value['valor'];
+                $precio = $value['precio'];
+
+                if( $value['producto'] == '32857' || $value['producto'] == '32858' || $value['producto'] == '32860' )
+                {
+                    if($value['precio'] == 0 && $valorImpConsumo != 0 && $iva == 0 )
+                    {
+                        $valor = $valorImpConsumo;
+                        $precio = $valorImpConsumo / $value['cantidad'];
+                        $valorImpConsumo = 0;
+                        $PorcImpConsumo = 0;
+                    }
+                    else
+                    {
+                        $valor = $value['valor'];
+                        $precio = $value['precio'];
+                        $valorImpConsumo = $valorImpConsumo;
+                        $PorcImpConsumo = $PorcImpConsumo;
+                    }
+                }
+
                 DB::connection('sqlsrv')->table('FacturasDetalle')->insert([
                     'Factura' => $factura,
                     'ClaseFactura' => $claseFactura,
@@ -371,10 +392,10 @@ class FacturaController extends Controller
                     'Oferta' => $value['oferta'],
                     'Unidades' => $value['cantidad'],
                     'Kilos' => $value['pesoPromedio'],
-                    'ValorProducto' => $value['valor'],
+                    'ValorProducto' => $valor,
                     'ValorDescuento' => $value['descuento'],
                     'ValorImpuesto' => $iva,
-                    'Precio' => $value['precio'],
+                    'Precio' => $precio,
                     'ValorOferta' => $value['valorOferta'],
                     'SaborBebida' => '',
                     'Empaque' => '',
