@@ -1047,7 +1047,7 @@ class FacturaController extends Controller
 
         $affectedF = DB::connection($sqlsrv)->table('Facturas')
             ->where(['Factura' => $Factura, 'ClaseFactura' => $ClaseFactura, 'Turno' => $turno])
-            ->update(['Estado' => 'I', 'MotivoAnulaFactura' => '031', 'UsuarioAnula' => $usuario, 'FechaAnula' => date('d.m.Y H:i:s'), 'NumeroAnula' => $numeroAnula,]);
+            ->update(['Estado' => 'I', 'Enviado' => '', 'MotivoAnulaFactura' => '031', 'UsuarioAnula' => $usuario, 'FechaAnula' => date('d.m.Y H:i:s'), 'NumeroAnula' => $numeroAnula,]);
 
         if ($affectedF == 0) {
             DB::connection($sqlsrv)->rollBack();
