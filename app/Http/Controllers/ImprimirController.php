@@ -295,7 +295,7 @@ class ImprimirController extends Controller
 
         $SqlFacturasDetalleCufe = 'select isnull(sum(fd.ValorProducto), 0) valorProducto, '
             . ' isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto), 0) valorImpuesto, '
-            . ' isnull(sum(fd.ValorImpUltraprocesado), 0) ValorImpUltra'
+            . ' isnull(sum(fd.ValorImpUltraprocesado), 0) ValorImpUltra, '
             . ' isnull(sum(fd.ValorImpConsumo), 0) ValorImpConsumo'
             . ' from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
             . " where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina "
@@ -320,7 +320,7 @@ class ImprimirController extends Controller
         $degusta = false;
 
         $fac = $fec = $hor = $docAdq = $cla = "";
-        $vf = $vi1 = $vi2 = $vi3 = $ia = $vb = $viUlt = 0;
+        $vf = $vi1 = $vi2 = $vi3 = $ia = $iaC = $iaUlt = $vb = $viUlt = 0;
 
         $SqlCentroLogisto = "select CentroLogistico from Parametros";
         $CentroLogisto = DB::connection($conexion)->select($SqlCentroLogisto);
@@ -668,13 +668,16 @@ class ImprimirController extends Controller
         $FacturasCufe = DB::connection($conexion)->select($SqlFacturasCufe, $parametros);
 
         $SqlFacturasDetalleCufe = 'select isnull(sum(fd.ValorProducto), 0) valorProducto, '
-            . 'isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto + fd.ValorImpUltraprocesado), 0) valorImpuesto '
+            . ' isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto), 0) valorImpuesto, '
+            . ' isnull(sum(fd.ValorImpUltraprocesado), 0) ValorImpUltra, '
+            . ' isnull(sum(fd.ValorImpConsumo), 0) ValorImpConsumo'
             . ' from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
             . " where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina "
             . " and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) ";
         $FacturasDetalleCufe = DB::connection($conexion)->select($SqlFacturasDetalleCufe, $parametros);
 
-        $SqlFacturasOfertasCufe = 'select fd.ValorOferta valorOferta, fd.PorcImpuesto porcImpuesto '
+        $SqlFacturasOfertasCufe = 'select fd.ValorOferta valorOferta, fd.PorcImpuesto porcImpuesto,fd.ValorImpConsumo,fd.PorcImpConsumo PorcImpConsumo, '
+            . 'fd.PorcImpUltraprocesado PorcImpUltra '
             . ' from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
             . ' where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina '
             . " and fd.Oferta = 'X' and p.GrupoArticulos <> (select isnull(FamiliaEmpaques, '') from Parametros) ";
@@ -691,7 +694,7 @@ class ImprimirController extends Controller
         $degusta = false;
 
         $fac = $fec = $hor = $docAdq = $cla = "";
-        $vf = $vi1 = $vi2 = $vi3 = $ia = $vb = 0;
+        $vf = $vi1 = $vi2 = $vi3 = $ia = $iaC = $iaUlt = $vb = $viUlt = 0;
 
         $SqlCentroLogisto = "select CentroLogistico from Parametros";
         $CentroLogisto = DB::connection($conexion)->select($SqlCentroLogisto);
@@ -728,15 +731,20 @@ class ImprimirController extends Controller
         if (count($FacturasDetalleCufe) > 0) {
             foreach ($FacturasDetalleCufe as $value) {
                 $vf += ($value->valorProducto - $value->valorDescuento);
-                $vi1 += $express ? 0 : $value->valorImpuesto;
-                $vi2 += $express ? $value->valorImpuesto : 0;
+                $vi1 += $value->valorImpuesto;
+                $vi2 += $value->ValorImpConsumo;
+                $viUlt += $value->ValorImpUltra;
             }
         }
 
         if (count($FacturasOfertasCufe) > 0) {
             foreach ($FacturasOfertasCufe as $value) {
                 $i = round($value->valorOferta * ($value->porcImpuesto / 100));
+                $iC = round($value->valorOferta * ($value->PorcImpConsumo / 100));
+                $iUlt = round($value->valorOferta * ($value->PorcImpUltra / 100));
                 $ia += $i;
+                $iaC += $iC;
+                $iaUlt += $iUlt;  
             }
         }
 
@@ -748,10 +756,11 @@ class ImprimirController extends Controller
 
         $ajuste = 0;
         $cuponV = 0;
-        $vi1 += $express ? 0 : $ia;
-        $vi2 += $express ? $ia : 0;
+        $vi1 += $ia;
+        $vi2 += $iaC;
+        $viUlt += $iaUlt;
 
-        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $vb - $ajuste - $cuponV - $ia);
+        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $viUlt + $vb - $ajuste - $cuponV - $ia);
 
         $valFac = intval($vf) . ".00";
         $valImp1 = intval($vi1) . ".00";
