@@ -310,7 +310,7 @@ class ImprimirController extends Controller
         $FacturasOfertasCufe = DB::connection($conexion)->select($SqlFacturasOfertasCufe, $parametros);
 
         $SqlFacturasOfertasEmpaque = 'select isnull(sum(fd.ValorProducto), 0) valorProducto, '
-            . '    isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto + fd.ValorImpUltraprocesado), 0) valorImpuesto '
+            . '    isnull(sum(fd.ValorDescuento), 0) valorDescuento, isnull(sum(fd.ValorImpuesto + fd.ValorImpUltraprocesado + fd.ValorImpConsumo), 0) valorImpuesto '
             . '    from FacturasDetalle fd inner join Productos p on fd.Producto = p.Producto '
             . ' where fd.Factura = :factura and fd.ClaseFactura = :clase and fd.PrefijoFactura = :prefijo and fd.Maquina = :maquina '
             . "    and p.GrupoArticulos in (select isnull(FamiliaEmpaques, '') from Parametros) ";
@@ -374,9 +374,11 @@ class ImprimirController extends Controller
             }
         }
 
+        $vbi = 0;
         if (count($FacturasEmpaqueCufe) > 0) {
             foreach ($FacturasEmpaqueCufe as $value) {
                 $vb += $value->valorProducto;
+                $vbi += $value->valorImpuesto;
             }
         }
 
@@ -386,9 +388,11 @@ class ImprimirController extends Controller
         $vi2 += $iaC;
         $viUlt += $iaUlt;
 
-        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $viUlt + $vb - $ajuste - $cuponV - $ia);
+        $vt = $degusta ? 0 : ($vf + $vi1 + $vi2 + $vi3 + $viUlt + $vb + $vbi - $ajuste - $cuponV - $ia - $iaC - $iaUlt);
 
-        $valFac = intval($vf) . ".00";
+        if($vb <= 0 || $vbi <= 0)  $vb = 0;
+
+        $valFac = intval($vf + $vb) . ".00";
         $valImp1 = intval($vi1) . ".00";
         $valImp2 = intval($vi2) . ".00";
         $valImp3 = intval($vi3) . ".00";
