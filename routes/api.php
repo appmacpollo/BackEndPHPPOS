@@ -8,6 +8,7 @@ use App\Http\Controllers\ImprimirController;
 use App\Http\Controllers\DatafonoController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\ComunController;
+use App\Http\Controllers\TurneroController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,3 +45,8 @@ Route::get('/ConsultarProductoExpress/{grupo}', [ProductoController::class, 'Con
 Route::get('/ImprimirFacturaExpress/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFacturaExpress']);
 Route::get('/ConsultarGrupos', [ProductoController::class, 'ConsultarGruposExpress']);
 Route::post('/facturarExpress', [FacturaController::class, 'facturarExpress']);
+
+// Turnero
+Route::get('/turnos', [TurneroController::class, 'index']);
+Route::post('/turnos/asignar', [TurneroController::class, 'asignarTurno']);
+Route::post('/turnos/procesar', [TurneroController::class, 'procesarTurno']);
