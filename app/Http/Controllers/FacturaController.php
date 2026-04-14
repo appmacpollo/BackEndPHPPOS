@@ -347,38 +347,42 @@ class FacturaController extends Controller
                 'EmpresaConvenio' => '',
                 'NombreConvenio' => ''
             ]);
+            // Consulta dinámica de productos de empaque (migración de lógica Java - ProductosEmpaques)
+            $sqlCabecera = "SELECT p.Producto producto, pr.UnidadMedidaVenta unidad, p.Nombre nombre, pr.Precio precio "
+                . "FROM Productos p LEFT JOIN Precios pr ON p.Producto = pr.Producto "
+                . "WHERE pr.GrupoPrecios = ? AND p.GrupoArticulos IN "
+                . "(SELECT isnull(FamiliaEmpaques, '') FROM Parametros) "
+                . "AND p.UnidadMedidaBase = 'S'";
+
+            $productosEmpaque = DB::connection('sqlsrv')->select(
+                $sqlCabecera,
+                [$grupoPrecios]
+            );
+            $listaEmpaques = array_map(function($item) {
+                return $item->producto;
+            }, $productosEmpaque);
 
             foreach ($items as $value) {
+                $esProductoEmpaque = in_array($value['producto'], $listaEmpaques);
+                $valorImpConsumo = $value['impConsumo'];
+                $iva = $value['iva'];
+                $valor = $value['valor'];
+                $precio = $value['precio'];
+                $impuesto = $value['impuesto'];
+                $PorcImpConsumo = 0;
+
                 if ($value['indExpress'] != 'X') {
                     $iva = $value['iva'];
                     $impuesto = $value['impuesto'];
-                    $PorcImpConsumo = 0;
-                    $valorImpConsumo = $value['impConsumo'];
                 } else {
-                    $iva = 0;
-                    $impuesto = 0;
-                    $PorcImpConsumo = $value['impuesto'];
-                    $valorImpConsumo = $value['iva'] + $value['impConsumo'];
-                }
-
-                $valor = $value['valor'];
-                $precio = $value['precio'];
-
-                if( $value['producto'] == '32857' || $value['producto'] == '32858' || $value['producto'] == '32860' )
-                {
-                    if($value['precio'] == 0 && $valorImpConsumo != 0 && $iva == 0 )
-                    {
-                        $valor = $valorImpConsumo;
-                        $precio = $valorImpConsumo / $value['cantidad'];
-                        $valorImpConsumo = 0;
-                        $PorcImpConsumo = 0;
-                    }
-                    else
-                    {
-                        $valor = $value['valor'];
-                        $precio = $value['precio'];
-                        $valorImpConsumo = $valorImpConsumo;
-                        $PorcImpConsumo = $PorcImpConsumo;
+                    if ($esProductoEmpaque) {
+                        if( $value['impConsumo'] > 0) {
+                            $valorImpConsumo = $value['impConsumo'];
+                            $impuesto = $value['impuesto'];
+                        }
+                    } else {
+                        $valorImpConsumo = $value['iva'];
+                        $impuesto = 0;
                     }
                 }
 
@@ -503,6 +507,20 @@ class FacturaController extends Controller
     public function facturacionProductos($productos, $express)
     {
         $facturacion = array();
+        
+        // Consulta dinámica de productos de empaque para validación
+        $grupoPrecios = env('grupoPrecios');
+        $sqlsrv = ($express == true) ? 'sqlsrv2' : 'sqlsrv';
+        $productosEmpaque = DB::connection($sqlsrv)->select(
+            "SELECT p.Producto producto FROM Productos p LEFT JOIN Precios pr ON p.Producto = pr.Producto "
+            . "WHERE pr.GrupoPrecios = ? AND p.GrupoArticulos IN "
+            . "(SELECT isnull(FamiliaEmpaques, '') FROM Parametros) "
+            . "AND p.UnidadMedidaBase = 'S'",
+            [$grupoPrecios]
+        );
+        $listaEmpaques = array_map(function($item) {
+            return $item->producto;
+        }, $productosEmpaque);
 
         $i = $cantidad = 0;
         foreach ($productos as $producto) {
@@ -544,6 +562,20 @@ class FacturaController extends Controller
                 $impProcesado = $value->impProcesado;
                 $indExpress = $value->indExpress;
                 $valorImpBolsa = $value->valorImpBolsa;
+            }
+
+            // Lógica migrada de Java: if(impBolsa > 0) indExpress = "X"
+            if ($valorImpBolsa > 0) {
+                $indExpress = "X";
+            }
+            
+            // Lógica migrada de Java: ValidarProductoEmpaque(c) && precio == 0
+            // Si es producto empaque y precio es 0, usar impBolsa como precio
+            $esProductoEmpaque = in_array($producto, $listaEmpaques);
+            if ($esProductoEmpaque && floatval($precio) == 0) {
+                $precio = $valorImpBolsa;       // pr = impBolsa
+                $valorImpBolsa = 0;             // impBolsa = 0
+                $impuesto = 0;                  // i = 0
             }
 
             if ($express == false && $lpesado == 'X') {
