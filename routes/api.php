@@ -9,6 +9,7 @@ use App\Http\Controllers\DatafonoController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\ComunController;
 use App\Http\Controllers\TurneroController;
+use App\Http\Controllers\SwaggerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,6 +21,9 @@ use App\Http\Controllers\TurneroController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+// Swagger/OpenAPI documentation
+Route::get('/documentation', [SwaggerController::class, 'docs']);
 
 Route::get('/ConsultarProducto/{ean}', [ProductoController::class, 'ConsultarProducto']);
 Route::get('/ImprimirFactura/{factura}/{clase}/{prefijo}/{maquina}', [ImprimirController::class, 'ImprimirFactura']);
