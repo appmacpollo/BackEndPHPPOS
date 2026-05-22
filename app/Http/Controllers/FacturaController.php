@@ -371,27 +371,18 @@ class FacturaController extends Controller
                 $impuesto = $value['impuesto'];
                 $PorcImpConsumo = 0;
 
-                // Lógica de impuestos migrada de Java (ProcesosPedidos.getConsolidadoProductos)
                 if ($value['indExpress'] != 'X') {
                     // Producto NO express - mantener valores originales
                     $iva = $value['iva'];
                     $impuesto = $value['impuesto'];
-                    $PorcImpConsumo = 0;
-                    $valorImpConsumo = $value['impConsumo'];
                 } else {
-                    // Producto express - Validación dinámica de productos de empaque
                     if ($esProductoEmpaque) {
-                        // Para empaques: el valor e impuesto ya vienen calculados desde facturacionProductos
-                        // (precio = impBolsa, pesoPromedio = 0, impuesto = 0)
-                        $valorImpConsumo = 0;  // No hay impConsumo adicional, ya está en el precio
-                        $PorcImpConsumo = 0;
-                        $impuesto = 0;
-                        $iva = 0;
+                        if( $value['impConsumo'] > 0) {
+                            $valorImpConsumo = $value['impConsumo'];
+                            $impuesto = $value['impuesto'];
+                        }
                     } else {
-                        // Para otros productos express: IVA se convierte en impConsumo
-                        $iva = 0;
-                        $valorImpConsumo = $value['iva'] + $value['impConsumo'];
-                        $PorcImpConsumo = $value['impuesto'];
+                        $valorImpConsumo = $value['iva'];
                         $impuesto = 0;
                     }
                 }
@@ -584,7 +575,6 @@ class FacturaController extends Controller
             $esProductoEmpaque = in_array($producto, $listaEmpaques);
             if ($esProductoEmpaque && floatval($precio) == 0) {
                 $precio = $valorImpBolsa;       // pr = impBolsa
-                $pesoPromedio = 0;              // p = 0
                 $valorImpBolsa = 0;             // impBolsa = 0
                 $impuesto = 0;                  // i = 0
             }
