@@ -53,4 +53,5 @@ Route::post('/facturarExpress', [FacturaController::class, 'facturarExpress']);
 // Turnero
 Route::get('/turnos', [TurneroController::class, 'index']);
 Route::post('/turnos/asignar', [TurneroController::class, 'asignarTurno']);
-Route::post('/turnos/procesar', [TurneroController::class, 'procesarTurno']);
+Route::post('/turnos/avanzar', [TurneroController::class, 'avanzarTurno']);
+Route::post('/turnos/retroceder', [TurneroController::class, 'retrocederTurno']);

@@ -11,6 +11,7 @@ class TurneroController extends Controller
 {
     private const ACTIVE_STATUSES = ['pendiente', 'llamado', 'en_atencion'];
     private const FIXED_BOX_NAME = 'Caja 1';
+    private const MAX_COMPLETED_HISTORY = 10;
 
     public function index(Request $request)
     {
@@ -72,6 +73,7 @@ class TurneroController extends Controller
                 'atendido_at' => null,
                 'finalizado_at' => null,
                 'eliminado_at' => null,
+                'orden_procesado' => null,
             ];
 
             $estado['turnos'][] = $turno;
@@ -90,11 +92,9 @@ class TurneroController extends Controller
         ], 200);
     }
 
-    public function procesarTurno(Request $request)
+    public function avanzarTurno(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'turnoId' => 'nullable|string',
-            'codigo' => 'nullable|string',
             'asesor' => 'nullable|string|max:120',
             'observaciones' => 'nullable|string|max:255',
         ]);
@@ -112,60 +112,17 @@ class TurneroController extends Controller
         try {
             $resultado = $this->withStateLock(function (array $estado) use ($payload) {
                 $turnos = $estado['turnos'] ?? [];
-                $indiceActual = $this->findCurrentProcessingIndex($turnos);
-                $indiceSolicitado = $this->findTurnIndex($turnos, $payload['turnoId'] ?? null, $payload['codigo'] ?? null);
-                $turnoProcesado = null;
+                $resultado = $this->advanceTurns($turnos, $payload);
 
-                if ($indiceActual !== null) {
-                    $turnoProcesado = $turnos[$indiceActual];
-                    $turnoProcesado['estado'] = 'finalizado';
-                    $turnoProcesado['finalizado_at'] = now()->toIso8601String();
-                    $turnoProcesado['updated_at'] = now()->toIso8601String();
-
-                    if (!empty($payload['observaciones'])) {
-                        $turnoProcesado['observaciones'] = $payload['observaciones'];
-                    }
-
-                    $turnos[$indiceActual] = $turnoProcesado;
-                }
-
-                $indiceSiguiente = null;
-
-                if ($indiceActual === null && $indiceSolicitado !== null && ($turnos[$indiceSolicitado]['estado'] ?? '') === 'pendiente') {
-                    $indiceSiguiente = $indiceSolicitado;
-                } else {
-                    $indiceSiguiente = $this->findFirstPendingIndex($turnos);
-                }
-
-                $turnoActual = null;
-
-                if ($indiceSiguiente !== null) {
-                    $turnoActual = $turnos[$indiceSiguiente];
-                    $turnoActual['estado'] = 'llamado';
-                    $turnoActual['caja'] = self::FIXED_BOX_NAME;
-                    $turnoActual['modulo'] = self::FIXED_BOX_NAME;
-                    $turnoActual['asesor'] = $payload['asesor'] ?? $turnoActual['asesor'];
-                    $turnoActual['llamado_at'] = now()->toIso8601String();
-                    $turnoActual['updated_at'] = now()->toIso8601String();
-
-                    if (!empty($payload['observaciones']) && $turnoProcesado === null) {
-                        $turnoActual['observaciones'] = $payload['observaciones'];
-                    }
-
-                    $turnos[$indiceSiguiente] = $turnoActual;
-                }
-
-                if ($turnoProcesado === null && $turnoActual === null) {
-                    throw new \RuntimeException('No hay turnos pendientes disponibles para llamar.');
-                }
+                $turnos = $this->trimCompletedHistory($resultado['turnos']);
 
                 $estado['turnos'] = $turnos;
 
                 return [
                     'state' => $estado,
                     'result' => [
-                        'turnoProcesado' => $turnoProcesado,
-                        'turnoActual' => $turnoActual,
+                        'turnoProcesado' => $resultado['turnoProcesado'],
+                        'turnoActual' => $resultado['turnoActual'],
                     ],
                 ];
             });
@@ -178,7 +135,56 @@ class TurneroController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Turno procesado correctamente.',
+            'message' => 'Turno avanzado correctamente.',
+            'turnoProcesado' => $resultado['turnoProcesado'],
+            'turno' => $resultado['turnoActual'],
+            'data' => $this->buildBoardData($this->loadState()),
+        ], 200);
+    }
+
+    public function retrocederTurno(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'asesor' => 'nullable|string|max:120',
+            'observaciones' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Los datos enviados para retroceder el turno no son validos.',
+                'errors' => $validator->errors(),
+            ], 200);
+        }
+
+        $payload = $validator->validated();
+
+        try {
+            $resultado = $this->withStateLock(function (array $estado) use ($payload) {
+                $turnos = $estado['turnos'] ?? [];
+                $resultado = $this->rollbackTurns($turnos, $payload);
+
+                $turnos = $this->trimCompletedHistory($resultado['turnos']);
+                $estado['turnos'] = $turnos;
+
+                return [
+                    'state' => $estado,
+                    'result' => [
+                        'turnoProcesado' => $resultado['turnoProcesado'],
+                        'turnoActual' => $resultado['turnoActual'],
+                    ],
+                ];
+            });
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => $exception->getMessage(),
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Turno retrocedido correctamente.',
             'turnoProcesado' => $resultado['turnoProcesado'],
             'turno' => $resultado['turnoActual'],
             'data' => $this->buildBoardData($this->loadState()),
@@ -189,16 +195,25 @@ class TurneroController extends Controller
     {
         $turnos = $estado['turnos'] ?? [];
         $activos = array_values(array_filter($turnos, fn ($turno) => in_array($turno['estado'], self::ACTIVE_STATUSES, true)));
-        usort($activos, fn ($a, $b) => $this->compareTurns($a, $b));
+        $turnoActual = null;
+        $turnosPendientes = [];
 
-        $turnosPendientes = array_values(array_filter($activos, fn ($turno) => ($turno['estado'] ?? '') === 'pendiente'));
+        foreach ($activos as $turno) {
+            if ($turnoActual === null && in_array($turno['estado'], ['llamado', 'en_atencion'], true)) {
+                $turnoActual = $turno;
+                continue;
+            }
+
+            if (($turno['estado'] ?? '') === 'pendiente') {
+                $turnosPendientes[] = $turno;
+            }
+        }
+
         usort($turnosPendientes, fn ($a, $b) => strcmp($a['created_at'], $b['created_at']));
-
-        $siguienteTurno = $this->resolveNextTurn($turnosPendientes);
-        $cajas = $this->buildServiceBoxes($activos);
+        $activos = array_values(array_merge($turnoActual ? [$turnoActual] : [], $turnosPendientes));
 
         $respuesta = [
-            'siguienteTurno' => $siguienteTurno,
+            'siguienteTurno' => $turnosPendientes[0] ?? null,
             'turnos' => $activos,
             'resumen' => [
                 'pendientes' => count(array_filter($activos, fn ($turno) => $turno['estado'] === 'pendiente')),
@@ -206,7 +221,12 @@ class TurneroController extends Controller
                 'enAtencion' => count(array_filter($activos, fn ($turno) => $turno['estado'] === 'en_atencion')),
                 'totalActivos' => count($activos),
             ],
-            'cajas' => $cajas,
+            'cajas' => [[
+                'name' => self::FIXED_BOX_NAME,
+                'advisor' => $turnoActual['asesor'] ?? 'Pendiente',
+                'state' => $turnoActual ? $this->presentStatus($turnoActual['estado']) : 'Disponible',
+                'currentTurn' => $turnoActual['codigo'] ?? '--',
+            ]],
             'actualizadoEn' => now()->toIso8601String(),
         ];
 
@@ -217,68 +237,111 @@ class TurneroController extends Controller
         return $respuesta;
     }
 
-    private function buildServiceBoxes(array $turnos): array
+    private function advanceTurns(array $turnos, array $payload): array
     {
-        $turnoActual = null;
+        $indiceActual = $this->findTurnIndex($turnos, ['llamado', 'en_atencion']);
+        $turnoProcesado = null;
+        $ordenProcesado = 1;
+
         foreach ($turnos as $turno) {
-            if (($turno['estado'] ?? '') === 'llamado') {
-                $turnoActual = $turno;
-                break;
-            }
+            $ordenProcesado = max($ordenProcesado, ((int) ($turno['orden_procesado'] ?? 0)) + 1);
         }
 
-        if ($turnoActual === null && count($turnos) > 0) {
-            $turnoActual = $turnos[0];
+        if ($indiceActual !== null) {
+            $turnoProcesado = $this->applyTurnChanges($turnos[$indiceActual], [
+                'estado' => 'finalizado',
+                'finalizado_at' => now()->toIso8601String(),
+                'orden_procesado' => $ordenProcesado,
+                'observaciones' => $payload['observaciones'] ?? $turnos[$indiceActual]['observaciones'],
+            ]);
+            $turnos[$indiceActual] = $turnoProcesado;
         }
 
-        return [[
-            'name' => self::FIXED_BOX_NAME,
-            'advisor' => $turnoActual['asesor'] ?? 'Pendiente',
-            'state' => $turnoActual ? $this->presentStatus($turnoActual['estado']) : 'Disponible',
-            'currentTurn' => $turnoActual['codigo'] ?? '--',
-        ]];
-    }
+        $indiceSiguiente = $this->findTurnIndex($turnos, ['pendiente']);
+        $turnoActual = null;
 
-    private function resolveNextTurn(array $turnos): ?array
-    {
-        if (count($turnos) === 0) {
-            return null;
+        if ($indiceSiguiente !== null) {
+            $turnoActual = $this->applyTurnChanges($turnos[$indiceSiguiente], [
+                'estado' => 'llamado',
+                'caja' => self::FIXED_BOX_NAME,
+                'modulo' => self::FIXED_BOX_NAME,
+                'asesor' => $payload['asesor'] ?? $turnos[$indiceSiguiente]['asesor'],
+                'llamado_at' => now()->toIso8601String(),
+                'finalizado_at' => null,
+                'observaciones' => $turnoProcesado === null && !empty($payload['observaciones'])
+                    ? $payload['observaciones']
+                    : $turnos[$indiceSiguiente]['observaciones'],
+            ]);
+            $turnos[$indiceSiguiente] = $turnoActual;
         }
 
-        $turno = $turnos[0];
+        if ($turnoProcesado === null && $turnoActual === null) {
+            throw new \RuntimeException('No hay turnos pendientes disponibles para llamar.');
+        }
 
         return [
-            'id' => $turno['id'],
-            'code' => $turno['codigo'],
-            'area' => $turno['area'],
-            'box' => 'Por asignar',
-            'note' => 'Tu turno permanece en cola y sera llamado pronto.',
-            'status' => $turno['estado'],
+            'turnos' => $turnos,
+            'turnoProcesado' => $turnoProcesado,
+            'turnoActual' => $turnoActual,
         ];
     }
 
-    private function compareTurns(array $left, array $right): int
+    private function rollbackTurns(array $turnos, array $payload): array
     {
-        $leftWeight = $this->statusWeight($left['estado']);
-        $rightWeight = $this->statusWeight($right['estado']);
+        $indiceActual = $this->findTurnIndex($turnos, ['llamado', 'en_atencion']);
+        $turnoProcesado = null;
 
-        if ($leftWeight !== $rightWeight) {
-            return $leftWeight <=> $rightWeight;
+        if ($indiceActual !== null) {
+            $turnoProcesado = $this->applyTurnChanges($turnos[$indiceActual], [
+                'estado' => 'pendiente',
+                'caja' => null,
+                'modulo' => null,
+                'asesor' => null,
+                'llamado_at' => null,
+                'atendido_at' => null,
+            ]);
+            $turnos[$indiceActual] = $turnoProcesado;
         }
 
-        return strcmp($left['created_at'], $right['created_at']);
+        $indiceRetroceso = $this->findTurnIndex($turnos, ['finalizado'], 'orden_procesado', true);
+
+        if ($indiceRetroceso === null) {
+            if ($turnoProcesado !== null) {
+                return [
+                    'turnos' => $turnos,
+                    'turnoProcesado' => null,
+                    'turnoActual' => null,
+                ];
+            }
+
+            throw new \RuntimeException('No hay turnos recientes para retroceder.');
+        }
+
+        $turnoActual = $this->applyTurnChanges($turnos[$indiceRetroceso], [
+            'estado' => 'llamado',
+            'caja' => self::FIXED_BOX_NAME,
+            'modulo' => self::FIXED_BOX_NAME,
+            'asesor' => $payload['asesor'] ?? $turnos[$indiceRetroceso]['asesor'],
+            'finalizado_at' => null,
+            'eliminado_at' => null,
+            'orden_procesado' => null,
+            'llamado_at' => now()->toIso8601String(),
+            'observaciones' => $payload['observaciones'] ?? $turnos[$indiceRetroceso]['observaciones'],
+        ]);
+        $turnos[$indiceRetroceso] = $turnoActual;
+
+        return [
+            'turnos' => $turnos,
+            'turnoProcesado' => null,
+            'turnoActual' => $turnoActual,
+        ];
     }
 
-    private function statusWeight(string $status): int
+    private function applyTurnChanges(array $turno, array $changes): array
     {
-        return match ($status) {
-            'llamado' => 0,
-            'pendiente' => 1,
-            'en_atencion' => 2,
-            'Atendiendo' => 2,
-            'Llamando' => 0,
-            default => 3,
-        };
+        return array_merge($turno, $changes, [
+            'updated_at' => now()->toIso8601String(),
+        ]);
     }
 
     private function presentStatus(string $status): string
@@ -294,55 +357,41 @@ class TurneroController extends Controller
         };
     }
 
-    private function findFirstPendingIndex(array $turnos): ?int
+    private function findTurnIndex(
+        array $turnos,
+        array $statuses,
+        string $sortBy = 'created_at',
+        bool $descending = false
+    ): ?int
     {
-        $pendientes = [];
+        $candidatos = [];
 
         foreach ($turnos as $indice => $turno) {
-            if (($turno['estado'] ?? '') === 'pendiente') {
-                $pendientes[$indice] = $turno;
+            if (!in_array($turno['estado'] ?? '', $statuses, true)) {
+                continue;
             }
+
+            $candidatos[$indice] = $turno;
         }
 
-        if (count($pendientes) === 0) {
+        if (count($candidatos) === 0) {
             return null;
         }
 
-        uasort($pendientes, fn ($a, $b) => strcmp($a['created_at'], $b['created_at']));
+        uasort($candidatos, function ($a, $b) use ($sortBy, $descending) {
+            $valorA = $a[$sortBy] ?? '';
+            $valorB = $b[$sortBy] ?? '';
 
-        return array_key_first($pendientes);
-    }
-
-    private function findCurrentProcessingIndex(array $turnos): ?int
-    {
-        foreach ($turnos as $indice => $turno) {
-            if (($turno['estado'] ?? '') === 'llamado') {
-                return $indice;
-            }
-        }
-
-        foreach ($turnos as $indice => $turno) {
-            if (($turno['estado'] ?? '') === 'en_atencion') {
-                return $indice;
-            }
-        }
-
-        return null;
-    }
-
-    private function findTurnIndex(array $turnos, ?string $turnoId, ?string $codigo): ?int
-    {
-        foreach ($turnos as $indice => $turno) {
-            if ($turnoId !== null && ($turno['id'] ?? '') === $turnoId) {
-                return $indice;
+            if (is_numeric($valorA) || is_numeric($valorB)) {
+                $resultado = ((int) $valorA) <=> ((int) $valorB);
+            } else {
+                $resultado = strcmp((string) $valorA, (string) $valorB);
             }
 
-            if ($codigo !== null && strcasecmp($turno['codigo'] ?? '', $codigo) === 0) {
-                return $indice;
-            }
-        }
+            return $descending ? -$resultado : $resultado;
+        });
 
-        return null;
+        return array_key_first($candidatos);
     }
 
     private function normalizePrefix(string $prefijo): string
@@ -351,6 +400,32 @@ class TurneroController extends Controller
         $normalizado = preg_replace('/[^A-Z]/', '', $normalizado) ?: 'T';
 
         return substr($normalizado, 0, 3);
+    }
+
+    private function trimCompletedHistory(array $turnos): array
+    {
+        $completados = [];
+
+        foreach ($turnos as $indice => $turno) {
+            if (($turno['estado'] ?? '') === 'finalizado' && !empty($turno['orden_procesado'])) {
+                $completados[$indice] = $turno;
+            }
+        }
+
+        if (count($completados) <= self::MAX_COMPLETED_HISTORY) {
+            return $turnos;
+        }
+
+        uasort($completados, fn ($a, $b) => ((int) ($b['orden_procesado'] ?? 0)) <=> ((int) ($a['orden_procesado'] ?? 0)));
+        $permitidos = array_slice(array_keys($completados), 0, self::MAX_COMPLETED_HISTORY);
+
+        foreach (array_keys($completados) as $indice) {
+            if (!in_array($indice, $permitidos, true)) {
+                unset($turnos[$indice]);
+            }
+        }
+
+        return array_values($turnos);
     }
 
     private function loadState(): array
